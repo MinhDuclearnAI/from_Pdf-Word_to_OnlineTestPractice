@@ -1,0 +1,91 @@
+exam-platform/
+├── backend/                   # FastAPI service
+├── frontend/                  # Next.js 14 app
+├── worker/                    # Celery workers (có thể tách deploy riêng)
+├── docker-compose.yml         # Local dev: postgres, redis, minio, backend, worker
+├── .env.example
+└── README.md
+
+backend/
+├── app/
+│   ├── main.py                          # Khởi tạo FastAPI app, mount routers, middleware, CORS
+│   ├── config.py                        # Pydantic Settings: DB_URL, REDIS_URL, ANTHROPIC_API_KEY, S3_*, JWT_SECRET
+│   ├── dependencies.py                  # get_db(), get_current_user(), get_current_teacher(), rate limiter
+│   │
+│   ├── core/
+│   │   ├── security.py                  # Hash password (bcrypt), tạo/verify JWT access & refresh token
+│   │   ├── celery_app.py                # Khởi tạo Celery instance, broker=Redis
+│   │   └── exceptions.py                # Custom exception classes (FileParsingError, InvalidSchemaError...)
+│   │
+│   ├── db/
+│   │   ├── base.py                      # SQLAlchemy Base, engine, SessionLocal
+│   │   ├── session.py                   # Context manager cho DB session (dùng trong Celery task, ngoài request scope)
+│   │   └── init_db.py                   # Seed data/migration helper cho dev
+│   │
+│   ├── models/                          # SQLAlchemy ORM models (map DB schema)
+│   │   ├── user.py                      # User (id, email, hashed_password, role: student|teacher)
+│   │   ├── class_model.py                # Class (id, name, teacher_id, subject)
+│   │   ├── enrollment.py                # ClassEnrollment (student_id, class_id) — bảng trung gian N-N
+│   │   ├── exam.py                      # Exam (id, class_id, title, subject, test_type, duration, open_at, close_at, result_visibility)
+│   │   ├── question.py                  # Question (id, exam_id, component_type, question_text, options JSONB, correct_answer, score_weight, passage_ref)
+│   │   ├── submission.py                # Submission (id, exam_id, student_id, answers JSONB, status, submitted_at, score)
+│   │   ├── submission_draft.py          # Autosave draft riêng biệt (tách khỏi submission chính thức để tránh race condition)
+│   │   └── ai_job.py                     # AIProcessingJob (id, file_url, status: pending|processing|done|failed, result_exam_id)
+│   │
+│   ├── schemas/                         # Pydantic schemas (request/response DTOs) — TÁCH RIÊNG khỏi ORM models
+│   │   ├── user.py                      # UserCreate, UserLogin, UserOut
+│   │   ├── exam.py                      # ExamCreate, ExamConfig, ExamOut, ExamSummary
+│   │   ├── question.py                  # QuestionSchema (strict schema validate output từ AI — Literal["mcq_standard", "latex_formula",...])
+│   │   ├── submission.py                # AnswerPayload, SubmissionCreate, SubmissionResult
+│   │   └── ai_processing.py             # AIParsingResult, ClassificationResult (subject, test_type, duration)
+│   │
+│   ├── api/
+│   │   ├── deps.py                      # Router-level dependency injection helpers
+│   │   └── v1/
+│   │       ├── router.py                # Gộp tất cả router con thành 1 APIRouter chính
+│   │       ├── auth.py                  # POST /auth/register, /auth/login, /auth/refresh, /auth/logout
+│   │       ├── users.py                 # GET /users/me, PATCH /users/me
+│   │       ├── classes.py               # CRUD lớp học, GET /classes/{id}/students
+│   │       ├── exams.py                 # CRUD đề thi, POST /exams/{id}/publish, GET /exams/{id}/stats (phổ điểm)
+│   │       ├── exam_upload.py           # POST /exams/upload — nhận file, tạo AIProcessingJob, trả job_id ngay (202 Accepted)
+│   │       ├── self_practice.py         # POST /practice/upload-quick — luồng học sinh tự upload đề luyện tập
+│   │       ├── submissions.py           # POST /submissions (nộp bài), PUT /submissions/{id}/autosave, GET /submissions/{id}
+│   │       ├── grading.py               # POST /submissions/{id}/grade-essay (trigger chấm tự luận bằng AI, async)
+│   │       ├── leaderboard.py           # GET /classes/{id}/leaderboard
+│   │       └── ws.py                    # WebSocket /ws/jobs/{job_id} — push trạng thái xử lý AI real-time
+│   │
+│   ├── services/                        # Business logic thuần, KHÔNG phụ thuộc FastAPI (dễ test, dễ tái sử dụng trong Celery)
+│   │   ├── file_extractor.py            # extract_pdf(), extract_docx(), detect_scanned_pdf()
+│   │   ├── ocr_service.py               # Fallback OCR (Tesseract) hoặc gửi ảnh trang PDF cho Claude Vision khi file là scan
+│   │   ├── ai_parser.py                 # classify_document(), extract_questions() — gọi Claude API, 2-pass pipeline
+│   │   ├── ai_grading.py                # grade_essay_answer() — so sánh đáp án học sinh với model_answer + rubric qua Claude API
+│   │   ├── schema_validator.py          # safe_json_parse() với Pydantic validate + retry logic khi LLM trả sai format
+│   │   ├── scoring_service.py           # Chấm điểm trắc nghiệm tự động (so sánh trực tiếp, không cần AI)
+│   │   ├── storage_service.py           # upload_to_s3(), get_presigned_url() — wrapper cho MinIO/S3 (boto3)
+│   │   └── notification_service.py      # publish_job_status() qua Redis Pub/Sub để WebSocket handler lắng nghe
+│   │
+│   ├── prompts/                         # Tách riêng prompt templates khỏi code logic — dễ version control & A/B test
+│   │   ├── classify_prompt.py           # Template phân loại subject/test_type
+│   │   ├── extract_prompt.py            # Template bóc tách câu hỏi + gán component_type
+│   │   └── grading_prompt.py            # Template chấm tự luận theo rubric
+│   │
+│   └── tasks/                           # Celery task definitions (import vào worker/)
+│       ├── exam_processing.py           # process_exam_upload_task() — pipeline đầy đủ: extract → classify → parse → validate → save
+│       └── grading_tasks.py             # grade_essay_task() — chấm từng câu tự luận bất đồng bộ
+│
+├── alembic/                             # Database migrations
+│   ├── versions/
+│   └── env.py
+├── tests/
+│   ├── test_ai_parser.py                # Unit test parse JSON, mock Claude API response
+│   ├── test_scoring.py                  # Test chấm trắc nghiệm
+│   └── test_api_exams.py                # Integration test endpoint
+│
+├──worker/
+│   ├──celery_worker.py
+│
+├── alembic.ini
+├── requirements.txt
+└── Dockerfile
+
+

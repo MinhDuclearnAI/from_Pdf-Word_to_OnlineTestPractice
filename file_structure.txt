@@ -1,7 +1,6 @@
 exam-platform/
 ├── backend/                   # FastAPI service
 ├── frontend/                  # Next.js 14 app
-├── worker/                    # Celery workers (có thể tách deploy riêng)
 ├── docker-compose.yml         # Local dev: postgres, redis, minio, backend, worker
 ├── .env.example
 └── README.md
@@ -89,3 +88,89 @@ backend/
 └── Dockerfile
 
 
+frontend/
+├── src/
+│   ├── app/
+│   │   ├── layout.tsx                   # Root layout, ThemeProvider, font
+│   │   ├── page.tsx                     # Landing page
+│   │   ├── (auth)/
+│   │   │   ├── login/page.tsx
+│   │   │   └── register/page.tsx
+│   │   │
+│   │   ├── (student)/
+│   │   │   ├── dashboard/page.tsx       # Danh sách môn học, bài kiểm tra (đã làm/cần làm)
+│   │   │   ├── practice/upload/page.tsx # UI "Upload đề nhanh" tự luyện tập
+│   │   │   ├── exam/[examId]/
+│   │   │   │   ├── page.tsx             # Trang intro đề thi (thông tin, nút Bắt đầu)
+│   │   │   │   └── play/page.tsx        # ExamPlayer — giao diện làm bài chính
+│   │   │   └── result/[submissionId]/page.tsx  # Xem điểm, xem lại chi tiết (nếu được cấp quyền)
+│   │   │
+│   │   ├── (teacher)/
+│   │   │   ├── dashboard/page.tsx       # Tổng quan các môn/lớp đang dạy
+│   │   │   ├── classes/[classId]/
+│   │   │   │   ├── page.tsx             # Danh sách học sinh trong lớp
+│   │   │   │   └── student/[studentId]/page.tsx  # Hồ sơ & điểm từng học sinh
+│   │   │   └── exams/
+│   │   │       ├── new/page.tsx         # Form upload đề + đáp án + cấu hình bài thi
+│   │   │       ├── [examId]/edit/page.tsx     # Sửa cấu hình / review câu hỏi AI đã bóc tách trước khi publish
+│   │   │       └── [examId]/stats/page.tsx    # Phổ điểm, bảng thống kê
+│   │   │
+│   │   └── api/                          # Next.js API routes (chỉ dùng nếu cần proxy/BFF, phần lớn gọi thẳng FastAPI)
+│   │       └── auth/[...nextauth]/route.ts
+│   │
+│   ├── components/
+│   │   ├── ui/                           # Base components (button, input, modal...) — có thể dùng shadcn/ui
+│   │   │
+│   │   ├── exam-player/                  # NHÓM QUAN TRỌNG NHẤT — dynamic rendering engine
+│   │   │   ├── ExamPlayer.tsx            # Container chính: quản lý state, timer, navigator
+│   │   │   ├── QuestionRenderer.tsx      # Component map: component_type -> component tương ứng
+│   │   │   ├── question-types/
+│   │   │   │   ├── MCQStandard.tsx       # Radio button 4 đáp án
+│   │   │   │   ├── LatexFormulaQuestion.tsx  # Render công thức bằng react-katex
+│   │   │   │   ├── ReadingSplitScreen.tsx    # Đoạn văn bên trái, câu hỏi bên phải (IELTS/Đọc hiểu)
+│   │   │   │   ├── EssayInput.tsx        # Textbox tự luận
+│   │   │   │   ├── FillBlankInput.tsx    # Điền từ vào chỗ trống
+│   │   │   │   └── UnknownQuestionFallback.tsx  # Fallback an toàn nếu component_type lạ
+│   │   │   ├── CountdownTimer.tsx        # Đếm ngược, tự động khóa bài khi hết giờ + popup nộp bài
+│   │   │   ├── QuestionNavigator.tsx     # Panel trạng thái câu hỏi (đã làm/chưa làm/gắn cờ)
+│   │   │   └── SubmitConfirmModal.tsx
+│   │   │
+│   │   ├── upload/
+│   │   │   ├── FileDropzone.tsx          # Upload PDF/DOCX (drag & drop)
+│   │   │   └── AIProcessingStatus.tsx    # Hiển thị tiến trình xử lý AI real-time (nghe WebSocket)
+│   │   │
+│   │   ├── dashboard/
+│   │   │   ├── ExamCard.tsx
+│   │   │   ├── SubjectList.tsx
+│   │   │   └── LeaderboardTable.tsx
+│   │   │
+│   │   └── teacher/
+│   │       ├── ExamConfigForm.tsx        # Cấu hình thời gian mở/đóng, loại đề, chế độ xem kết quả
+│   │       ├── QuestionReviewList.tsx    # Cho GV review/sửa câu hỏi AI bóc tách trước khi publish
+│   │       └── ScoreDistributionChart.tsx # Dùng recharts vẽ phổ điểm
+│   │
+│   ├── hooks/
+│   │   ├── useExamDraft.ts               # Hook quản lý autosave: đọc/ghi localStorage + debounce sync server
+│   │   ├── useCountdown.ts               # Logic đếm ngược tái sử dụng được
+│   │   ├── useAIJobStatus.ts             # Hook poll hoặc subscribe WebSocket theo job_id
+│   │   └── useAuth.ts                    # Hook lấy user hiện tại, role-based redirect
+│   │
+│   ├── store/
+│   │   └── examStore.ts                  # Zustand store: answers, flaggedQuestions, currentIndex, timeRemaining
+│   │
+│   ├── lib/
+│   │   ├── api-client.ts                 # Axios/fetch wrapper, tự động đính JWT, xử lý refresh token
+│   │   ├── websocket-client.ts           # Kết nối WS tới backend cho job status
+│   │   └── constants.ts                  # COMPONENT_TYPE_MAP, SUBJECT_LABELS, DURATION_BY_TEST_TYPE
+│   │
+│   ├── types/
+│   │   ├── exam.ts                       # TypeScript types khớp với Pydantic schemas backend (Question, Exam, Submission)
+│   │   └── ai.ts                         # AIJobStatus, ClassificationResult
+│   │
+│   └── middleware.ts                     # Next.js middleware: bảo vệ route theo role (student/teacher)
+│
+├── public/
+├── tailwind.config.ts
+├── next.config.js
+├── package.json
+└── Dockerfile

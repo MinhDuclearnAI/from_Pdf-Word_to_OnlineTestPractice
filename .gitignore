@@ -1,0 +1,125 @@
+############################################
+# .gitignore — Monorepo: backend (FastAPI/Python) + frontend (Next.js) + worker + infra
+############################################
+
+# ============ SECRETS / ENV — QUAN TRỌNG NHẤT ============
+.env
+.env.*
+!.env.example
+!.env.*.example
+*.pem
+*.key
+credentials.json
+secrets/
+
+# ============ PYTHON / BACKEND / WORKER ============
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual environments
+venv/
+.venv/
+env/
+ENV/
+backend/venv/
+backend/.venv/
+
+# Packaging
+build/
+dist/
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+
+# Testing / coverage
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+.tox/
+.mypy_cache/
+.ruff_cache/
+
+# Alembic — giữ lại file migration, chỉ ignore cache tạm nếu có
+# (KHÔNG ignore backend/alembic/versions/ — đây là code cần commit)
+
+# Jupyter (nếu dùng để thử nghiệm prompt/pipeline)
+.ipynb_checkpoints/
+*.ipynb
+
+# ============ NODE / FRONTEND (Next.js) ============
+node_modules/
+frontend/node_modules/
+
+# Next.js build output
+.next/
+out/
+frontend/.next/
+frontend/out/
+
+# Production build
+build/
+frontend/build/
+
+# Cache
+.npm/
+.eslintcache
+.turbo/
+
+# Testing
+coverage/
+frontend/coverage/
+
+# Debug logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# TypeScript incremental build info
+*.tsbuildinfo
+next-env.d.ts
+
+# ============ DOCKER / INFRA ============
+# Volumes data mount ra ngoài (nếu có bind mount local thay vì named volume)
+pgdata/
+miniodata/
+docker-compose.override.yml
+
+# ============ UPLOADED / GENERATED FILES (không nên lưu trong Git, đã có MinIO) ============
+backend/uploads/
+backend/tmp/
+*.pdf
+*.docx
+!docs/**/*.pdf
+!docs/**/*.docx
+
+# Ngoại lệ: file mẫu/test cố định trong tests/ vẫn cần giữ
+!backend/tests/fixtures/*.pdf
+!backend/tests/fixtures/*.docx
+
+# ============ OS / EDITOR ============
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+.idea/
+.vscode/
+!.vscode/extensions.json
+*.sublime-workspace
+
+# ============ LOGS ============
+*.log
+logs/
+celery.log
+celerybeat-schedule
+celerybeat.pid
+
+# ============ MISC ============
+.cache/
+*.bak
+*.tmp

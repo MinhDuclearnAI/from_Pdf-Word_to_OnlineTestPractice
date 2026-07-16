@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 from typing import Any, Union, Optional
 
 import jwt
-from passlib.context import CryptContext
+import bcrypt
 
 # Trong thực tế, bạn sẽ import cấu hình từ app.config
 # Ví dụ: from app.config import settings
@@ -15,22 +15,22 @@ class MockSettings:
 
 settings = MockSettings()
 
-# Khởi tạo ngữ cảnh của Passlib để sử dụng thuật toán bcrypt
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """
     Kiểm tra mật khẩu người dùng nhập vào có khớp với mật khẩu đã băm trong cơ sở dữ liệu hay không.
     """
-    return pwd_context.verify(plain_password, hashed_password)
+    try:
+        return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
+    except Exception:
+        return False
 
 
 def get_password_hash(password: str) -> str:
     """
     Băm mật khẩu bằng thuật toán bcrypt trước khi lưu vào cơ sở dữ liệu.
     """
-    return pwd_context.hash(password)
+    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
 
 
 def create_access_token(

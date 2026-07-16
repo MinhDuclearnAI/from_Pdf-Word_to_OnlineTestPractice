@@ -74,8 +74,8 @@ class ExamOut(ExamBase):
     """
     id: int
     class_id: int
-    created_at: datetime
-    updated_at: datetime
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
 
     # ConfigDict(from_attributes=True) thay thế cho orm_mode=True trong Pydantic V2
     # Giúp Pydantic có thể đọc trực tiếp dữ liệu từ object của SQLAlchemy

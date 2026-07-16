@@ -12,6 +12,9 @@ from app.api.v1.router import api_router
 # Import Custom Exceptions
 from app.core.exceptions import BaseAppException
 
+# Import models to ensure all models are registered in SQLAlchemy registry
+import app.models
+
 # ==========================================
 # 1. Quản lý vòng đời ứng dụng (Lifespan)
 # ==========================================

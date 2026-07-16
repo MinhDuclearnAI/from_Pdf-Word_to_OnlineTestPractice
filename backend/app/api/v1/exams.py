@@ -13,9 +13,11 @@ from app.models.class_model import Class
 from app.models.exam import Exam
 from app.models.enrollment import ClassEnrollment
 from app.models.submission import Submission
+from app.models.question import Question
 
 # Import Schemas
 from app.schemas.exam import ExamOut, ExamConfig, ExamUpdate
+from app.schemas.question import QuestionOut, QuestionUpdate, QuestionCreate, QuestionForStudentOut
 
 # Import Exceptions
 from app.core.exceptions import ResourceNotFoundError, PermissionDeniedError
@@ -187,4 +189,131 @@ def delete_exam(
     db.delete(exam)
     db.commit()
     
+    return None
+
+
+# ==========================================
+# 6. Lấy danh sách Câu hỏi của Đề thi (GET /exams/{exam_id}/questions)
+# ==========================================
+@router.get("/{exam_id}/questions", response_model=List[Any])
+def get_exam_questions(
+    exam_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Lấy danh sách các câu hỏi trong đề thi.
+    - Học sinh: Trả về QuestionForStudentOut (không có correct_answer).
+    - Giáo viên: Trả về QuestionOut (có correct_answer).
+    """
+    # 1. Kiểm tra đề thi tồn tại
+    exam = db.query(Exam).filter(Exam.id == exam_id).first()
+    if not exam:
+        raise ResourceNotFoundError("Không tìm thấy đề thi này.")
+
+    # 2. Phân quyền
+    if current_user.role == "student":
+        # Học sinh tự luyện hoặc học sinh trong lớp học
+        if exam.class_id:
+            enrollment = db.query(ClassEnrollment).filter(
+                ClassEnrollment.class_id == exam.class_id,
+                ClassEnrollment.student_id == current_user.id
+            ).first()
+            # Nếu không phải lớp cá nhân (Self-Practice) và không ghi danh
+            if not enrollment:
+                # Kiểm tra xem đây có phải lớp tự luyện tập không
+                target_class = db.query(Class).filter(Class.id == exam.class_id).first()
+                if not target_class or target_class.subject != "Self-Practice" or target_class.teacher_id != current_user.id:
+                    raise PermissionDeniedError("Bạn không có quyền truy cập đề thi của lớp này.")
+
+        # Lấy câu hỏi
+        questions = db.query(Question).filter(Question.exam_id == exam_id).all()
+        # Dùng QuestionForStudentOut để giấu correct_answer
+        return [QuestionForStudentOut.model_validate(q) for q in questions]
+
+    else:
+        # Giáo viên
+        _check_teacher_exam_permission(db, exam_id, current_user.id)
+        questions = db.query(Question).filter(Question.exam_id == exam_id).all()
+        return [QuestionOut.model_validate(q) for q in questions]
+
+
+# ==========================================
+# 7. Sửa một Câu hỏi (PATCH /exams/{exam_id}/questions/{question_id})
+# ==========================================
+@router.patch("/{exam_id}/questions/{question_id}", response_model=QuestionOut)
+def update_question(
+    exam_id: int,
+    question_id: int,
+    question_in: QuestionUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_teacher)
+):
+    """
+    Cập nhật nội dung/đáp án của một câu hỏi. Chỉ dành cho Giáo viên quản lý lớp.
+    """
+    _check_teacher_exam_permission(db, exam_id, current_user.id)
+    question = db.query(Question).filter(Question.id == question_id, Question.exam_id == exam_id).first()
+    if not question:
+        raise ResourceNotFoundError("Không tìm thấy câu hỏi này trong đề thi.")
+
+    update_data = question_in.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(question, field, value)
+
+    db.commit()
+    db.refresh(question)
+    return question
+
+
+# ==========================================
+# 8. Thêm mới một Câu hỏi (POST /exams/{exam_id}/questions)
+# ==========================================
+@router.post("/{exam_id}/questions", response_model=QuestionOut, status_code=201)
+def create_question(
+    exam_id: int,
+    question_in: QuestionCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_teacher)
+):
+    """
+    Thêm thủ công một câu hỏi vào đề thi. Chỉ dành cho Giáo viên quản lý lớp.
+    """
+    _check_teacher_exam_permission(db, exam_id, current_user.id)
+    new_question = Question(
+        exam_id=exam_id,
+        component_type=question_in.component_type,
+        question_text=question_in.question_text,
+        options=question_in.options,
+        correct_answer=question_in.correct_answer,
+        score_weight=question_in.score_weight,
+        passage_ref=question_in.passage_ref,
+        answer_placeholder=question_in.answer_placeholder
+    )
+    db.add(new_question)
+    db.commit()
+    db.refresh(new_question)
+    return new_question
+
+
+# ==========================================
+# 9. Xóa một Câu hỏi (DELETE /exams/{exam_id}/questions/{question_id})
+# ==========================================
+@router.delete("/{exam_id}/questions/{question_id}", status_code=204)
+def delete_question(
+    exam_id: int,
+    question_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_teacher)
+):
+    """
+    Xóa một câu hỏi khỏi đề thi. Chỉ dành cho Giáo viên quản lý lớp.
+    """
+    _check_teacher_exam_permission(db, exam_id, current_user.id)
+    question = db.query(Question).filter(Question.id == question_id, Question.exam_id == exam_id).first()
+    if not question:
+        raise ResourceNotFoundError("Không tìm thấy câu hỏi này trong đề thi.")
+
+    db.delete(question)
+    db.commit()
     return None

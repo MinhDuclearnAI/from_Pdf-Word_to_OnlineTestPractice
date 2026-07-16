@@ -71,4 +71,4 @@ EXPOSE 8000
 
 # Lệnh mặc định khi container khởi chạy (Dành cho FastAPI Server)
 # Số lượng workers (4) có thể điều chỉnh linh hoạt tùy số core CPU của server
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4"]
+CMD ["sh", "-c", "alembic upgrade head && python initial_data.py && uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4"]

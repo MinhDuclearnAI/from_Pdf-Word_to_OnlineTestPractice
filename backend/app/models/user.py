@@ -1,5 +1,5 @@
 import enum
-from sqlalchemy import Column, Integer, String, Boolean, Enum, DateTime
+from sqlalchemy import Column, Integer, String, Boolean, Enum, DateTime, Date
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 
@@ -22,6 +22,11 @@ class User(Base):
     email = Column(String, unique=True, index=True, nullable=False)
     hashed_password = Column(String, nullable=False)
     full_name = Column(String, index=True, nullable=True)
+    
+    # Thông tin bổ sung
+    date_of_birth = Column(Date, nullable=True)
+    school = Column(String, nullable=True)
+    workplace = Column(String, nullable=True)
     
     # Sử dụng Enum cho role để đảm bảo tính toàn vẹn dữ liệu
     role = Column(Enum(UserRole), default=UserRole.student, nullable=False)

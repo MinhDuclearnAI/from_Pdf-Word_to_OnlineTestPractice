@@ -1,12 +1,6 @@
-############################################
-# .gitignore — Monorepo: backend (FastAPI/Python) + frontend (Next.js) + worker + infra
-############################################
-
-# ============ SECRETS / ENV — QUAN TRỌNG NHẤT ============
 .env
 .env.*
 !.env.example
-!.env.*.example
 *.pem
 *.key
 credentials.json

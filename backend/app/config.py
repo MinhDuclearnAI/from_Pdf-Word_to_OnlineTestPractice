@@ -10,7 +10,14 @@ class Settings(BaseSettings):
     API_V1_STR: str = "/api/v1"
     
     # Cấu hình CORS để Next.js (Frontend) có thể gọi API mà không bị chặn
-    BACKEND_CORS_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:8000"]
+    BACKEND_CORS_ORIGINS: Any = ["http://localhost:3000", "http://localhost:8000"]
+
+    @field_validator("BACKEND_CORS_ORIGINS", mode="before")
+    @classmethod
+    def assemble_cors_origins(cls, v: Any) -> Any:
+        if isinstance(v, str) and not v.startswith("["):
+            return [i.strip() for i in v.split(",")]
+        return v
 
     # ==========================================
     # 2. Cấu hình Database (PostgreSQL)
@@ -24,11 +31,15 @@ class Settings(BaseSettings):
     SQLALCHEMY_DATABASE_URI: Optional[str] = None
 
     @field_validator("SQLALCHEMY_DATABASE_URI", mode="before")
-    def assemble_db_connection(cls, v: Optional[str], info) -> Any:
+    @classmethod
+    def assemble_db_connection(cls, v: Optional[str]) -> Any:
         """
-        Tự động build chuỗi kết nối Database dựa trên các biến môi trường đơn lẻ.
-        Nếu trong .env đã truyền sẵn chuỗi URI hoàn chỉnh thì sẽ ưu tiên dùng nó.
+        Tự động lấy chuỗi kết nối từ biến DATABASE_URL trong .env trước.
         """
+        import os
+        db_url = os.getenv("DATABASE_URL")
+        if db_url:
+            return db_url
         if isinstance(v, str) and v.strip():
             return v
         
@@ -63,8 +74,8 @@ class Settings(BaseSettings):
     GEMINI_API_KEY: Optional[str] = None
     
     # Model mặc định để bóc tách và chấm điểm
-    DEFAULT_EXTRACTION_MODEL: str = "gpt-4o-mini"
-    DEFAULT_GRADING_MODEL: str = "claude-3-haiku-20240307"
+    DEFAULT_EXTRACTION_MODEL: str = "gemini-2.5-flash-lite"
+    DEFAULT_GRADING_MODEL: str = "gemini-2.5-flash-lite"
 
     # ==========================================
     # 6. Cấu hình Storage (AWS S3 / MinIO Local)

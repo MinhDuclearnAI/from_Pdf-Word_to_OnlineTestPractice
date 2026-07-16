@@ -40,6 +40,16 @@ def register(user_in: UserCreate, db: Session = Depends(get_db)):
     """
     Đăng ký tài khoản mới cho Học sinh hoặc Giáo viên.
     """
+    from fastapi import HTTPException
+    
+    # 0. Validate yêu cầu bổ sung
+    if user_in.role == "student":
+        if not user_in.full_name or not user_in.date_of_birth or not user_in.school:
+            raise HTTPException(status_code=400, detail="Học sinh bắt buộc phải nhập Họ tên, Ngày sinh và Trường lớp.")
+    elif user_in.role == "teacher":
+        if not user_in.full_name or not user_in.workplace:
+            raise HTTPException(status_code=400, detail="Giáo viên bắt buộc phải nhập Họ tên và Nơi công tác.")
+
     # 1. Kiểm tra xem email đã tồn tại trong hệ thống chưa
     user_exists = db.query(User).filter(User.email == user_in.email).first()
     if user_exists:
@@ -52,7 +62,11 @@ def register(user_in: UserCreate, db: Session = Depends(get_db)):
     new_user = User(
         email=user_in.email,
         hashed_password=hashed_pwd,
-        role=user_in.role
+        role=user_in.role,
+        full_name=user_in.full_name,
+        date_of_birth=user_in.date_of_birth,
+        school=user_in.school,
+        workplace=user_in.workplace
     )
     
     db.add(new_user)

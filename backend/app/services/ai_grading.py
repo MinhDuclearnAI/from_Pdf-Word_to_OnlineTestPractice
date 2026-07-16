@@ -1,7 +1,8 @@
 import json
 import logging
 from typing import Optional, Dict
-from anthropic import Anthropic, APIError, APITimeoutError
+import google.generativeai as genai
+from google.generativeai.types import generation_types
 from pydantic import BaseModel, Field, ValidationError
 
 from app.config import settings
@@ -43,9 +44,8 @@ class AIGradingService:
     """
     
     def __init__(self):
-        self.client = Anthropic(api_key=settings.ANTHROPIC_API_KEY)
-        # Bắt buộc dùng mô hình có khả năng suy luận logic tốt nhất cho việc chấm điểm (Sonnet 3.5)
-        self.model = "claude-3-5-sonnet-20240620"
+        genai.configure(api_key=settings.GEMINI_API_KEY)
+        self.model = settings.DEFAULT_GRADING_MODEL
         self.max_retries = 3
 
     def grade_essay_answer(
@@ -105,20 +105,21 @@ class AIGradingService:
         attempt = 0
         while attempt < self.max_retries:
             try:
-                response = self.client.messages.create(
-                    model=self.model,
-                    max_tokens=1500,
-                    # Temperature = 0 là BẮT BUỘC để kết quả chấm điểm mang tính tất định (deterministic),
-                    # Đảm bảo cùng 1 bài làm luôn ra cùng 1 điểm số.
-                    temperature=0.0, 
-                    system=GRADING_SYSTEM_PROMPT,
-                    messages=[
-                        {"role": "user", "content": user_prompt},
-                        {"role": "assistant", "content": "{"} # Prefill để ép ra JSON Object
-                    ]
+                model = genai.GenerativeModel(
+                    model_name=self.model,
+                    system_instruction=GRADING_SYSTEM_PROMPT
                 )
                 
-                raw_json = "{" + response.content[0].text
+                response = model.generate_content(
+                    user_prompt,
+                    generation_config=genai.types.GenerationConfig(
+                        temperature=0.0,
+                        max_output_tokens=1500,
+                        response_mime_type="application/json"
+                    )
+                )
+                
+                raw_json = response.text
                 result = safe_json_parse(raw_json, GradingResult)
                 
                 # Hậu kiểm điểm số: Đảm bảo AI không sinh ra điểm lớn hơn max_score do lỗi logic
@@ -131,22 +132,20 @@ class AIGradingService:
                 logger.info(f"Đã chấm xong. Điểm: {result.score}/{max_score}")
                 return result
 
-            except ValidationError as e:
-                attempt += 1
-                logger.warning(f"Lần {attempt}: AI trả về sai format Pydantic khi chấm bài. Đang thử lại... Chi tiết lỗi: {e}")
-                if attempt >= self.max_retries:
-                    logger.error("Đã hết số lần thử lại. Trả về điểm mặc định cần review.")
-                    # Trong production, ta trả về 0 hoặc null kèm flag để giáo viên vào chấm tay
-                    return GradingResult(
-                        explanation="Hệ thống AI không thể chuẩn hóa kết quả chấm. Cần giáo viên chấm thủ công.",
-                        score=0.0
-                    )
-            except (APIError, APITimeoutError) as e:
-                logger.error(f"Lỗi API Anthropic khi chấm bài: {str(e)}")
-                raise FileParsingError("Lỗi giao tiếp với máy chủ AI trong quá trình chấm tự luận.")
             except Exception as e:
-                logger.exception("Lỗi hệ thống không xác định khi chấm điểm.")
-                raise FileParsingError("Đã xảy ra lỗi khi xử lý kết quả chấm bài.")
+                if isinstance(e, ValidationError):
+                    attempt += 1
+                    logger.warning(f"Lần {attempt}: AI trả về sai format Pydantic khi chấm bài. Đang thử lại... Chi tiết lỗi: {e}")
+                    if attempt >= self.max_retries:
+                        logger.error("Đã hết số lần thử lại. Trả về điểm mặc định cần review.")
+                        # Trong production, ta trả về 0 hoặc null kèm flag để giáo viên vào chấm tay
+                        return GradingResult(
+                            explanation="Hệ thống AI không thể chuẩn hóa kết quả chấm. Cần giáo viên chấm thủ công.",
+                            score=0.0
+                        )
+                else:
+                    logger.error(f"Lỗi API Google Generative AI khi chấm bài: {str(e)}")
+                    raise FileParsingError("Lỗi giao tiếp với máy chủ AI trong quá trình chấm tự luận.")
 
 # Khởi tạo Singleton
 ai_grader = AIGradingService()

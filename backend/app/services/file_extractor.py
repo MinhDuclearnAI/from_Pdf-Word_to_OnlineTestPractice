@@ -2,18 +2,9 @@ import os
 import logging
 import fitz  # PyMuPDF
 import docx
-import spacy
 from typing import Optional, Tuple
 
 logger = logging.getLogger(__name__)
-
-# Khởi tạo mô hình ngôn ngữ nhẹ để xử lý và chuẩn hóa văn bản.
-# Đảm bảo bạn đã chạy lệnh: python -m spacy download xx_ent_wiki_sm (hoặc vi_core_news_sm)
-try:
-    nlp = spacy.load("xx_ent_wiki_sm")
-except OSError:
-    logger.warning("Không tìm thấy model spaCy. Đang sử dụng model blank fallback.")
-    nlp = spacy.blank("xx")
 
 class FileParsingError(Exception):
     """Custom exception khi không thể đọc hoặc parse file."""
@@ -27,9 +18,7 @@ def clean_and_normalize_text(raw_text: str) -> str:
     if not raw_text or not raw_text.strip():
         return ""
 
-    # Cho dữ liệu chạy qua pipeline của spaCy
-    doc = nlp(raw_text)
-    
+
     cleaned_lines = []
     for line in raw_text.splitlines():
         # Xóa khoảng trắng thừa ở đầu/cuối, chuẩn hóa multi-spaces thành 1 space

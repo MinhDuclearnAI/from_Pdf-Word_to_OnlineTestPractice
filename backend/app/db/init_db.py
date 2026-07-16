@@ -47,13 +47,14 @@ def init_db(db: Session) -> None:
         # 4. Tạo 1 Đề thi mẫu cho Lớp học này
         demo_exam = Exam(
             class_id=demo_class.id,
+            creator_id=teacher.id,
             title="Đề Thi Thử Toán Lần 1",
             subject="Toán",
-            test_type="practice",
+            exam_type="practice",
             duration=90, # 90 phút
             open_at=datetime.utcnow(),
             close_at=datetime.utcnow() + timedelta(days=7), # Mở trong 7 ngày
-            result_visibility="detailed"
+            result_visibility="full"
         )
         db.add(demo_exam)
         

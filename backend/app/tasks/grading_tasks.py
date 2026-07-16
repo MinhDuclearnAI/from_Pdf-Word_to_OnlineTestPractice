@@ -36,7 +36,7 @@ def grade_essay_task(self, submission_id: int) -> None:
             return
 
         # Bỏ qua nếu bài đã chấm xong (tránh tình trạng double-grading nếu task bị duplicate)
-        if submission.status == "COMPLETED":
+        if submission.status == "completed":
             logger.info(f"Submission {submission_id} đã hoàn tất chấm điểm. Bỏ qua.")
             return
 
@@ -103,7 +103,7 @@ def grade_essay_task(self, submission_id: int) -> None:
             # Giả định submission.score đang lưu điểm trắc nghiệm (được tính từ scoring_service)
             current_score = float(submission.score or 0.0)
             submission.score = current_score + total_ai_score
-            submission.status = "COMPLETED"
+            submission.status = "completed"
 
             # Lưu trực tiếp feedback của AI vào lại cột answers JSONB (hoặc một cột ai_feedbacks riêng nếu bạn có)
             # Dùng dict clone để báo cho SQLAlchemy biết JSONB có sự thay đổi

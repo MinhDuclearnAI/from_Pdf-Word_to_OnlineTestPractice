@@ -95,7 +95,8 @@ def upload_self_practice_exam(
         # 4. Tạo bản ghi Job để theo dõi trạng thái
         new_job = AIProcessingJob(
             file_url=object_key,
-            status="pending"
+            status="pending",
+            creator_id=current_user.id
         )
         db.add(new_job)
         db.commit()

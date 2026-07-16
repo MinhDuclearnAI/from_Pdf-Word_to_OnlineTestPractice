@@ -1,5 +1,5 @@
 from typing import Literal, Optional
-from datetime import datetime
+from datetime import datetime, date
 from pydantic import BaseModel, EmailStr, Field, ConfigDict
 
 # ==========================================
@@ -39,6 +39,10 @@ class UserCreate(UserBase):
         min_length=6, 
         description="Mật khẩu người dùng (yêu cầu tối thiểu 6 ký tự)"
     )
+    full_name: Optional[str] = Field(None, description="Họ và tên")
+    date_of_birth: Optional[date] = Field(None, description="Ngày tháng năm sinh")
+    school: Optional[str] = Field(None, description="Trường lớp (dành cho học sinh)")
+    workplace: Optional[str] = Field(None, description="Nơi công tác (dành cho giáo viên)")
 
 
 class UserLogin(BaseModel):
@@ -71,8 +75,8 @@ class UserOut(UserBase):
     Tuyệt đối không chứa trường 'password' hay 'hashed_password' để đảm bảo an toàn.
     """
     id: int = Field(..., description="ID duy nhất của người dùng")
-    created_at: datetime
-    updated_at: datetime
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
 
     # ConfigDict(from_attributes=True) giúp Pydantic đọc trực tiếp data từ SQLAlchemy ORM object
     model_config = ConfigDict(from_attributes=True)

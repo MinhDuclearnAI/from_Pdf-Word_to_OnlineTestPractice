@@ -11,9 +11,9 @@ class SubmissionStatus(str, enum.Enum):
     """
     Trạng thái của bài nộp, rất quan trọng khi hệ thống có chấm điểm tự luận bằng AI.
     """
-    submitted = "submitted"  # Vừa nộp, chờ xử lý (hoặc đã chấm xong trắc nghiệm nhưng chờ tự luận)
-    grading = "grading"      # Đang được AI/Worker chấm điểm ngầm
-    graded = "graded"        # Đã chấm xong toàn bộ, điểm số đã chốt
+    submitted = "submitted"
+    pending_grading = "pending_grading"
+    completed = "completed"
 
 class Submission(Base):
     __tablename__ = "submissions"

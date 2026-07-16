@@ -12,6 +12,8 @@ from app.models.submission import Submission
 from app.models.exam import Exam
 from app.models.class_model import Class
 from app.models.enrollment import ClassEnrollment
+from app.models.question import Question
+from app.models.submission_draft import SubmissionDraft
 
 # Import Schemas
 from app.schemas.submission import (
@@ -59,16 +61,26 @@ def submit_exam(
     if not enrollment:
         raise PermissionDeniedError("Bạn không thuộc lớp học này.")
 
-    # 3. Tính điểm phần trắc nghiệm và thống kê số câu
-    # scoring_service sẽ trả về object chứa điểm, số câu đúng/sai và cờ báo có câu tự luận hay không
+    # 3. Lấy danh sách câu hỏi từ DB và tính điểm phần trắc nghiệm
+    questions = db.query(Question).filter(Question.exam_id == exam.id).all()
+    exam_questions = [
+        {
+            "id": q.id,
+            "type": q.component_type.value,
+            "correct_answer": q.correct_answer,
+            "score_weight": q.score_weight
+        }
+        for q in questions
+    ]
+
     score_result = scoring_service.calculate_exam_score(
-        db=db, 
-        exam_id=exam.id, 
-        student_answers=submission_in.answers
+        student_answers=submission_in.answers,
+        exam_questions=exam_questions
     )
 
     # Xác định trạng thái cuối cùng
-    final_status = "pending_grading" if score_result.has_essays else "completed"
+    summary = score_result["summary"]
+    final_status = "pending_grading" if summary["needs_ai_grading"] else "completed"
 
     # 4. Lưu bài nộp vào DB
     new_submission = Submission(
@@ -76,10 +88,17 @@ def submit_exam(
         student_id=current_user.id,
         answers=submission_in.answers,
         status=final_status,
-        score=score_result.total_score,
+        score=summary["score_scale_10"],
         submitted_at=datetime.utcnow()
     )
     db.add(new_submission)
+    
+    # Xóa bản nháp (nếu có) sau khi nộp bài thành công
+    db.query(SubmissionDraft).filter(
+        SubmissionDraft.student_id == current_user.id,
+        SubmissionDraft.exam_id == exam.id
+    ).delete(synchronize_session=False)
+
     db.commit()
     db.refresh(new_submission)
 
@@ -90,9 +109,9 @@ def submit_exam(
 
     # Convert object ORM sang Pydantic model để trả về
     result = SubmissionResult.model_validate(new_submission)
-    result.correct_count = score_result.correct_count
-    result.incorrect_count = score_result.incorrect_count
-    result.unanswered_count = score_result.unanswered_count
+    result.correct_count = summary["correct_count"]
+    result.incorrect_count = summary["incorrect_count"]
+    result.unanswered_count = summary["unanswered_count"]
 
     # Ẩn đáp án nếu cấu hình không cho phép xem chi tiết
     if exam.result_visibility == "score_only":
@@ -102,11 +121,11 @@ def submit_exam(
 
 
 # ==========================================
-# 2. Lưu nháp bài làm (PUT /submissions/{id}/autosave)
+# 2. Lưu nháp bài làm (PUT /submissions/{exam_id}/autosave)
 # ==========================================
-@router.put("/{submission_id}/autosave", response_model=dict)
+@router.put("/{exam_id}/autosave", response_model=dict)
 def autosave_submission(
-    submission_id: int,
+    exam_id: int,
     draft_in: SubmissionDraftUpdate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
@@ -114,21 +133,51 @@ def autosave_submission(
     """
     Tự động lưu trạng thái bài làm định kỳ từ Frontend để tránh mất dữ liệu.
     """
-    submission = db.query(Submission).filter(Submission.id == submission_id).first()
-    if not submission:
-        raise ResourceNotFoundError("Không tìm thấy phiên làm bài.")
+    # Kiểm tra đề thi có tồn tại không
+    exam = db.query(Exam).filter(Exam.id == exam_id).first()
+    if not exam:
+        raise ResourceNotFoundError("Không tìm thấy đề thi này.")
 
-    if submission.student_id != current_user.id:
-        raise PermissionDeniedError("Bạn không có quyền chỉnh sửa bài làm này.")
+    # Tìm hoặc tạo bản nháp mới
+    draft = db.query(SubmissionDraft).filter(
+        SubmissionDraft.student_id == current_user.id,
+        SubmissionDraft.exam_id == exam_id
+    ).first()
 
-    if submission.status != "in_progress":
-        raise BaseAppException("Bài thi đã được nộp, không thể lưu nháp thêm.", status_code=400)
-
-    # Cập nhật cột JSONB
-    submission.answers = draft_in.answers
+    if not draft:
+        draft = SubmissionDraft(
+            student_id=current_user.id,
+            exam_id=exam_id,
+            answers=draft_in.answers
+        )
+        db.add(draft)
+    else:
+        draft.answers = draft_in.answers
+        
     db.commit()
-
     return {"message": "Đã lưu nháp thành công."}
+
+
+# ==========================================
+# 2.1 Lấy nháp bài làm (GET /submissions/{exam_id}/draft)
+# ==========================================
+@router.get("/{exam_id}/draft", response_model=dict)
+def get_submission_draft(
+    exam_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Lấy trạng thái bài làm nháp hiện tại của học sinh để tiếp tục làm bài.
+    """
+    draft = db.query(SubmissionDraft).filter(
+        SubmissionDraft.student_id == current_user.id,
+        SubmissionDraft.exam_id == exam_id
+    ).first()
+    
+    if not draft:
+        return {"answers": {}}
+    return {"answers": draft.answers}
 
 
 # ==========================================

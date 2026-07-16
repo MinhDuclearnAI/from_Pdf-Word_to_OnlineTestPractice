@@ -11,10 +11,11 @@ from app.models.user import User
 from app.models.class_model import Class
 from app.models.enrollment import ClassEnrollment
 
-# Import Schemas (Giả định bạn có app/schemas/class_schema.py tương tự user.py)
-# Nếu chưa có, bạn có thể tạo schema tương tự như phần dưới cùng của block code này.
+# Import Schemas
 from app.schemas.class_schema import ClassCreate, ClassOut
 from app.schemas.user import UserOut
+from app.schemas.exam import ExamSummary
+from app.models.exam import Exam
 
 # Import Exceptions
 from app.core.exceptions import ResourceNotFoundError, PermissionDeniedError, DuplicateResourceError, BaseAppException
@@ -176,3 +177,58 @@ def get_students_in_class(
     )
     
     return students
+
+
+# ==========================================
+# 6. Lấy danh sách Đề thi của Lớp học (GET /classes/{class_id}/exams)
+# ==========================================
+@router.get("/{class_id}/exams", response_model=List[ExamSummary])
+def get_class_exams(
+    class_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Lấy danh sách các đề thi/bài kiểm tra trong lớp học.
+    Giáo viên quản lý hoặc học sinh trong lớp học mới được xem.
+    """
+    target_class = db.query(Class).filter(Class.id == class_id).first()
+    if not target_class:
+        raise ResourceNotFoundError("Không tìm thấy lớp học này.")
+
+    # Kiểm tra phân quyền
+    if current_user.role == "teacher":
+        if target_class.teacher_id != current_user.id:
+            raise PermissionDeniedError("Bạn không có quyền quản lý lớp học này.")
+    else:
+        enrollment = db.query(ClassEnrollment).filter(
+            ClassEnrollment.class_id == class_id,
+            ClassEnrollment.student_id == current_user.id
+        ).first()
+        if not enrollment:
+            raise PermissionDeniedError("Bạn không thuộc lớp học này.")
+
+    exams = db.query(Exam).filter(Exam.class_id == class_id).all()
+    
+    import datetime
+    now = datetime.datetime.utcnow()
+    results = []
+    for e in exams:
+        # Active if open_at is past and close_at is future (or close_at is null)
+        is_active = True
+        if e.open_at and now < e.open_at:
+            is_active = False
+        if e.close_at and now > e.close_at:
+            is_active = False
+            
+        results.append(
+            ExamSummary(
+                id=e.id,
+                title=e.title,
+                subject=e.subject,
+                test_type=e.exam_type.value,
+                duration=e.duration or 0,
+                is_active=is_active
+            )
+        )
+    return results

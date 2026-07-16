@@ -6,10 +6,10 @@ from pydantic import BaseModel, Field, ConfigDict
 # ==========================================
 ComponentType = Literal[
     "multiple_choice", 
-    "essay", 
-    "latex_formula", 
+    "math_equation", 
     "reading_passage",
-    "writing"
+    "fill_in_the_blank",
+    "essay"
 ]
 
 

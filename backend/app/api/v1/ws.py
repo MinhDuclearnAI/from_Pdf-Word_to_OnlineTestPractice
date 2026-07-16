@@ -9,11 +9,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-# Trong thực tế, URL này nên được lấy từ app.config.settings
-class MockSettings:
-    REDIS_URL = "redis://localhost:6379/0"
-
-settings = MockSettings()
+from app.config import settings
 
 # ==========================================
 # API WebSocket: Lắng nghe trạng thái Job (WS /ws/jobs/{job_id})

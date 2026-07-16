@@ -30,8 +30,12 @@ ALLOWED_EXTENSIONS = {".pdf", ".docx", ".doc"}
 # ==========================================
 @router.post("/upload", response_model=AIJobCreateResponse, status_code=status.HTTP_202_ACCEPTED)
 def upload_exam_file(
-    # Sử dụng Form(...) để nhận class_id gửi kèm theo file dạng multipart/form-data
+    # Sử dụng Form(...) để nhận các thông tin đi kèm file dạng multipart/form-data
     class_id: int = Form(..., description="ID của lớp học mà đề thi này thuộc về"),
+    title: str = Form(..., description="Tiêu đề của đề thi"),
+    subject: str = Form(..., description="Môn học của đề thi"),
+    duration: int = Form(60, description="Thời gian làm bài (phút)"),
+    test_type: str = Form("exam", description="Dạng bài thi (exam, homework, practice)"),
     file: UploadFile = File(..., description="File đề thi định dạng PDF hoặc DOCX"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_teacher)
@@ -69,7 +73,8 @@ def upload_exam_file(
         # Job này dùng để lưu trữ trạng thái tiến độ (pending -> processing -> done/failed)
         new_job = AIProcessingJob(
             file_url=object_key,
-            status="pending"
+            status="pending",
+            creator_id=current_user.id
         )
         db.add(new_job)
         db.commit()
@@ -79,7 +84,11 @@ def upload_exam_file(
         # Hàm .delay() giúp request này kết thúc ngay lập tức mà không phải chờ AI chạy 
         process_exam_upload_task.delay(
             job_id=new_job.id, 
-            class_id=class_id
+            class_id=class_id,
+            title=title,
+            subject=subject,
+            duration=duration,
+            test_type=test_type
         )
 
         # 6. Trả về Response

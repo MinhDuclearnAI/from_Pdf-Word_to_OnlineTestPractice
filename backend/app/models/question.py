@@ -29,7 +29,7 @@ class Question(Base):
     component_type = Column(Enum(ComponentType), nullable=False)
 
     # Nội dung câu hỏi. Dùng Text thay vì String vì nội dung đề (đặc biệt bài Reading) có thể rất dài
-    content = Column(Text, nullable=False)
+    question_text = Column(Text, nullable=False)
 
     # ==========================================
     # CÁC TRƯỜNG DỮ LIỆU ĐỘNG (JSONB)

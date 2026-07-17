@@ -28,7 +28,7 @@ async def websocket_job_status(websocket: WebSocket, job_id: str):
     pubsub = redis_client.pubsub()
     
     # Tên channel phải khớp tuyệt đối với tên channel mà notification_service (hoặc celery task) bắn ra
-    channel_name = f"job_{job_id}"
+    channel_name = f"channel:ai_job_status:{job_id}"
     
     try:
         # 3. Đăng ký theo dõi (Subscribe) channel tương ứng với job_id
@@ -45,7 +45,13 @@ async def websocket_job_status(websocket: WebSocket, job_id: str):
                 data_str = message["data"].decode("utf-8")
                 
                 # Bắn dữ liệu thẳng về Frontend qua WebSocket
-                await websocket.send_text(data_str)
+                try:
+                    await websocket.send_text(data_str)
+                except (WebSocketDisconnect, RuntimeError):
+                    # Client đã rời trang hoặc backend vừa reload trong môi trường dev.
+                    # Không tiếp tục publish vào một transport đã đóng.
+                    logger.info(f"WebSocket client đã đóng trước khi nhận trạng thái job {job_id}.")
+                    break
                 
                 # (Tùy chọn) Kiểm tra nếu tiến trình đã "done" hoặc "failed" thì có thể chủ động ngắt kết nối
                 try:
@@ -69,9 +75,12 @@ async def websocket_job_status(websocket: WebSocket, job_id: str):
         
     finally:
         # 5. Dọn dẹp tài nguyên cực kỳ quan trọng để tránh rò rỉ bộ nhớ (Memory Leak)
-        await pubsub.unsubscribe(channel_name)
-        await pubsub.close()
-        await redis_client.aclose() # Đóng kết nối Redis
+        try:
+            await pubsub.unsubscribe(channel_name)
+            await pubsub.close()
+            await redis_client.aclose() # Đóng kết nối Redis
+        except Exception as cleanup_error:
+            logger.debug(f"Lỗi dọn dẹp Redis cho job {job_id}: {cleanup_error}")
         
         # Đảm bảo socket đã được đóng an toàn
         try:

@@ -79,6 +79,7 @@ export const QuestionReviewList: React.FC<QuestionReviewListProps> = ({ examId, 
   const handleAddQuestion = async () => {
     try {
       await apiClient.post(`/exams/${examId}/questions`, {
+        exam_id: Number(examId),
         component_type: "multiple_choice",
         question_text: "Nội dung câu hỏi mới...",
         options: ["Đáp án A", "Đáp án B", "Đáp án C", "Đáp án D"],
@@ -167,7 +168,7 @@ export const QuestionReviewList: React.FC<QuestionReviewListProps> = ({ examId, 
                           className="w-full px-4 py-2 bg-slate-900 border border-slate-800 rounded-lg text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
                         >
                           <option value="multiple_choice">Trắc nghiệm</option>
-                          <option value="latex_formula">Công thức Toán (LaTeX)</option>
+                          <option value="math_equation">Công thức Toán (LaTeX)</option>
                           <option value="essay">Tự luận</option>
                           <option value="fill_in_the_blank">Điền khuyết</option>
                         </select>

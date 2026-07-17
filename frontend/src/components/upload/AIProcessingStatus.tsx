@@ -13,6 +13,8 @@ export const AIProcessingStatus: React.FC<AIProcessingStatusProps> = ({ jobId, o
   const [progress, setProgress] = useState(0);
   const [message, setMessage] = useState("Đang gửi tệp tới hàng đợi xử lý...");
 
+  const isDoneRef = React.useRef(false);
+
   useEffect(() => {
     const disconnect = connectToJobWS(
       jobId,
@@ -21,19 +23,22 @@ export const AIProcessingStatus: React.FC<AIProcessingStatusProps> = ({ jobId, o
         setProgress(data.progress);
         setMessage(data.message);
 
-        if (data.status === "done" && data.result_data?.exam_id) {
-          setTimeout(() => {
-            onComplete(data.result_data.exam_id);
-          }, 1000);
+        if (data.status === "done" && data.result?.exam_id) {
+          isDoneRef.current = true;
+          // Redirect immediately to avoid race conditions with WS disconnect
+          onComplete(data.result.exam_id);
         } else if (data.status === "failed") {
+          isDoneRef.current = true;
           onFailed(data.message);
         }
       },
       (err) => {
-        console.error("WS error:", err);
-        setStatus("failed");
-        setMessage("Lỗi kết nối máy chủ để cập nhật tiến trình.");
-        onFailed("Lỗi kết nối máy chủ.");
+        if (!isDoneRef.current) {
+          console.error("WS error:", err);
+          setStatus("failed");
+          setMessage("Lỗi kết nối máy chủ để cập nhật tiến trình.");
+          onFailed("Lỗi kết nối máy chủ.");
+        }
       }
     );
 

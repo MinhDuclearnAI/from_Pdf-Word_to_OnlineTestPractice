@@ -1,8 +1,7 @@
 import json
 import logging
 from typing import Optional, Dict
-import google.generativeai as genai
-from google.generativeai.types import generation_types
+from openai import OpenAI
 from pydantic import BaseModel, Field, ValidationError
 
 from app.config import settings
@@ -44,7 +43,7 @@ class AIGradingService:
     """
     
     def __init__(self):
-        genai.configure(api_key=settings.GEMINI_API_KEY)
+        self.client = OpenAI(api_key=settings.GEMINI_API_KEY, base_url=settings.GEMINI_BASE_URL)
         self.model = settings.DEFAULT_GRADING_MODEL
         self.max_retries = 3
 
@@ -105,21 +104,18 @@ class AIGradingService:
         attempt = 0
         while attempt < self.max_retries:
             try:
-                model = genai.GenerativeModel(
-                    model_name=self.model,
-                    system_instruction=GRADING_SYSTEM_PROMPT
+                response = self.client.chat.completions.create(
+                    model=self.model,
+                    messages=[
+                        {"role": "system", "content": GRADING_SYSTEM_PROMPT},
+                        {"role": "user", "content": user_prompt}
+                    ],
+                    temperature=0.0,
+                    max_tokens=1500,
+                    response_format={"type": "json_object"}
                 )
                 
-                response = model.generate_content(
-                    user_prompt,
-                    generation_config=genai.types.GenerationConfig(
-                        temperature=0.0,
-                        max_output_tokens=1500,
-                        response_mime_type="application/json"
-                    )
-                )
-                
-                raw_json = response.text
+                raw_json = response.choices[0].message.content
                 result = safe_json_parse(raw_json, GradingResult)
                 
                 # Hậu kiểm điểm số: Đảm bảo AI không sinh ra điểm lớn hơn max_score do lỗi logic
@@ -144,7 +140,7 @@ class AIGradingService:
                             score=0.0
                         )
                 else:
-                    logger.error(f"Lỗi API Google Generative AI khi chấm bài: {str(e)}")
+                    logger.error(f"Lỗi API khi chấm bài: {str(e)}")
                     raise FileParsingError("Lỗi giao tiếp với máy chủ AI trong quá trình chấm tự luận.")
 
 # Khởi tạo Singleton

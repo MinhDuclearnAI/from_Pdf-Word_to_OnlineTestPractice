@@ -21,7 +21,7 @@ export const ExamConfigForm: React.FC<ExamConfigFormProps> = ({ initialConfig, o
   const [closeAt, setCloseAt] = useState(
     initialConfig.close_at ? new Date(initialConfig.close_at).toISOString().slice(0, 16) : ""
   );
-  const [resultVisibility, setResultVisibility] = useState(initialConfig.result_visibility || "full");
+  const [resultVisibility, setResultVisibility] = useState(initialConfig.result_visibility || "detailed");
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -70,9 +70,9 @@ export const ExamConfigForm: React.FC<ExamConfigFormProps> = ({ initialConfig, o
           onChange={(e) => setResultVisibility(e.target.value)}
           className="w-full px-4 py-2.5 bg-slate-900 border border-slate-800 rounded-lg text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
         >
-          <option value="full">Xem điểm & xem chi tiết đáp án ngay</option>
+          <option value="detailed">Xem điểm & xem chi tiết đáp án ngay</option>
           <option value="score_only">Chỉ xem điểm, ẩn đáp án</option>
-          <option value="hidden">Ẩn hoàn toàn (Giáo viên công bố sau)</option>
+          <option value="after_close">Ẩn hoàn toàn (Giáo viên công bố sau)</option>
         </select>
       </div>
 

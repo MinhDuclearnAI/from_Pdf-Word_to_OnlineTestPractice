@@ -1,5 +1,5 @@
 from typing import List, Dict, Any
-from datetime import datetime
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from sqlalchemy import func
@@ -109,7 +109,7 @@ def publish_exam(
 
     # Nếu chưa có thời gian mở, set thành ngay bây giờ
     if not exam.open_at:
-        exam.open_at = datetime.utcnow()
+        exam.open_at = datetime.now(timezone.utc)
     
     db.commit()
     db.refresh(exam)

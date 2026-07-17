@@ -1,5 +1,5 @@
-from typing import Optional, List, Literal
-from pydantic import BaseModel, Field, ConfigDict
+from typing import Any, Optional, List, Literal
+from pydantic import BaseModel, Field, ConfigDict, model_validator
 
 # ==========================================
 # Khai báo các loại Component hỗ trợ UI/UX
@@ -55,6 +55,67 @@ class QuestionSchema(BaseModel):
         description="Gợi ý hiển thị trong ô nhập liệu (Placeholder) đối với câu tự luận"
     )
 
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_llm_question(cls, value: Any) -> Any:
+        """Normalize common OpenAI-compatible LLM output before validation.
+
+        Providers frequently return the semantically equivalent keys
+        ``question_number``, ``question`` and ``answer``.  Keeping this
+        boundary normalization here lets the rest of the application rely on
+        one canonical question contract.
+        """
+        if not isinstance(value, dict):
+            return value
+
+        data = dict(value)
+
+        if "id" not in data and data.get("question_number") is not None:
+            data["id"] = f"q{data['question_number']}"
+        elif "id" in data:
+            data["id"] = str(data["id"])
+
+        if "question_text" not in data and data.get("question") is not None:
+            data["question_text"] = data["question"]
+
+        if "correct_answer" not in data and data.get("answer") is not None:
+            data["correct_answer"] = str(data["answer"])
+
+        raw_options = data.get("options", data.get("choices"))
+        if isinstance(raw_options, dict):
+            normalized_options: List[str] = []
+            for label, option in raw_options.items():
+                option_text = str(option).strip()
+                label_text = str(label).strip()
+                normalized_options.append(
+                    option_text if option_text.startswith(f"{label_text}.") else f"{label_text}. {option_text}"
+                )
+            data["options"] = normalized_options
+        elif raw_options is None:
+            data["options"] = []
+        elif isinstance(raw_options, list):
+            data["options"] = [str(option) for option in raw_options]
+
+        raw_type = data.get("type")
+        type_aliases = {
+            "multiple choice": "multiple_choice",
+            "multiple-choice": "multiple_choice",
+            "mcq": "multiple_choice",
+            "fill blank": "fill_in_the_blank",
+            "fill-in-the-blank": "fill_in_the_blank",
+            "writing": "essay",
+            "latex_formula": "math_equation",
+        }
+        if isinstance(raw_type, str):
+            data["type"] = type_aliases.get(raw_type.strip().lower(), raw_type.strip().lower())
+        elif data["options"]:
+            data["type"] = "multiple_choice"
+        else:
+            question_text = str(data.get("question_text", ""))
+            data["type"] = "fill_in_the_blank" if "_" in question_text else "essay"
+
+        return data
+
 
 class ExamExtractionSchema(BaseModel):
     """
@@ -65,6 +126,14 @@ class ExamExtractionSchema(BaseModel):
         ..., 
         description="Danh sách các câu hỏi đã được AI bóc tách và phân loại"
     )
+
+    @model_validator(mode="before")
+    @classmethod
+    def wrap_legacy_question_list(cls, value: Any) -> Any:
+        """Accept a bare list from older prompts while preserving one output model."""
+        if isinstance(value, list):
+            return {"questions": value}
+        return value
 
 
 # ==========================================

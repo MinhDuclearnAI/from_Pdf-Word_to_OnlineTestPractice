@@ -31,10 +31,10 @@ Mỗi đối tượng câu hỏi PHẢI tuân thủ chính xác Schema sau:
             "id": "Tạo một ID duy nhất cho câu hỏi (ví dụ: 'q1', 'q2').",
             "type": "Phân loại dạng trả lời của câu hỏi. BẮT BUỘC chọn 1 trong 4 giá trị: 'multiple_choice' (trắc nghiệm), 'essay' (tự luận), 'math_equation' (công thức toán/lý/hóa phức tạp), 'fill_in_the_blank' (điền vào chỗ trống). Không bao giờ dùng 'reading_passage'.",
             "question_text": "Nội dung đầy đủ của câu hỏi.",
-            "options": ["A. Nội dung 1", "B. Nội dung 2", "C. Nội dung 3", "D. Nội dung 4"], // Chỉ dùng cho câu multiple_choice, nếu không có hãy để mảng rỗng []
+            "options": ["A. Nội dung 1", "B. Nội dung 2", "C. Nội dung 3", "D. Nội dung 4"],
             "correct_answer": "Trích xuất đáp án đúng nếu có trong tài liệu (ví dụ: 'A'). Nếu không tìm thấy, trả về null.",
-            "score_weight": 1.0, // Điểm mặc định cho câu hỏi này (thường là 1.0)
-            "passage_ref": "Nếu câu hỏi này là câu hỏi Đọc hiểu (Reading Comprehension) thuộc một đoạn văn/bài đọc, hãy trích xuất toàn bộ nội dung đoạn văn bài đọc vào đây. Các câu hỏi thuộc cùng một bài đọc sẽ có nội dung passage_ref giống nhau. LƯU Ý: Trường 'type' bên trên vẫn phải đặt là 'multiple_choice' hoặc 'essay' tùy theo cách trả lời, không được đặt là 'reading_passage'. Nếu không phải bài đọc hiểu, trả về null.",
+            "score_weight": 1.0,
+            "passage_ref": "Nếu câu hỏi này là câu hỏi Đọc hiểu (Reading Comprehension) thuộc một đoạn văn/bài đọc, hãy trích xuất toàn bộ nội dung đoạn văn bài đọc vào đây. LƯU Ý: Trường 'type' bên trên vẫn phải đặt là 'multiple_choice' hoặc 'essay', không được đặt là 'reading_passage'. Nếu không phải bài đọc hiểu, trả về null.",
             "answer_placeholder": "Gợi ý hiển thị trong ô nhập liệu đối với câu 'essay' hoặc 'fill_in_the_blank' (ví dụ: 'Nhập câu trả lời...'). Trắc nghiệm thì để null."
         }}
     ]
@@ -49,3 +49,4 @@ def get_extraction_prompt(document_text: str) -> str:
     # Loại bỏ các khoảng trắng thừa quá mức nhưng vẫn giữ lại cấu trúc ngắt dòng ( \n )
     # vì các câu trắc nghiệm thường được phân tách bằng dấu xuống dòng.
     cleaned_text = re.sub(r'\n{3,}', '\n\n', document_text).strip()
+    return EXTRACT_USER_PROMPT_TEMPLATE.format(document_text=cleaned_text)

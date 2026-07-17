@@ -72,6 +72,7 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: Optional[str] = None
     ANTHROPIC_API_KEY: Optional[str] = None
     GEMINI_API_KEY: Optional[str] = None
+    GEMINI_BASE_URL: str = "https://api.vilao.ai/v1"
     
     # Model mặc định để bóc tách và chấm điểm
     DEFAULT_EXTRACTION_MODEL: str = "gemini-2.5-flash-lite"

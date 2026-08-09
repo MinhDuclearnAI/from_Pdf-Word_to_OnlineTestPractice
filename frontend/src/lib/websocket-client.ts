@@ -7,6 +7,7 @@ export const connectToJobWS = (
   onClose?: () => void
 ) => {
   const socket = new WebSocket(`${WS_URL}/jobs/${jobId}`);
+  let isIntentionallyClosed = false;
 
   socket.onmessage = (event) => {
     try {
@@ -19,7 +20,9 @@ export const connectToJobWS = (
 
   if (onError) {
     socket.onerror = (error) => {
-      onError(error);
+      if (!isIntentionallyClosed) {
+        onError(error);
+      }
     };
   }
 
@@ -28,6 +31,7 @@ export const connectToJobWS = (
   };
 
   return () => {
+    isIntentionallyClosed = true;
     socket.close();
   };
 };

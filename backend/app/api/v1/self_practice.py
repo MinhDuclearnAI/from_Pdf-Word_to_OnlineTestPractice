@@ -52,7 +52,13 @@ def _get_or_create_personal_workspace(db: Session, student: User) -> int:
         db.commit()
         db.refresh(personal_class)
         
-        # Tự động ghi danh học sinh vào lớp học này
+    # 3. Luôn đảm bảo học sinh đã được ghi danh (Enrollment) vào lớp tự luyện
+    enrollment = db.query(ClassEnrollment).filter(
+        ClassEnrollment.class_id == personal_class.id,
+        ClassEnrollment.student_id == student.id
+    ).first()
+    
+    if not enrollment:
         enrollment = ClassEnrollment(
             class_id=personal_class.id,
             student_id=student.id
@@ -103,10 +109,14 @@ def upload_self_practice_exam(
         db.refresh(new_job)
 
         # 5. Đẩy Task xử lý nền vào Celery Worker
-        # Tái sử dụng hoàn toàn pipeline bóc tách đề của Giáo viên
+        # Bổ sung các tham số mặc định cho đề tự luyện để khớp với Task Signature
         process_exam_upload_task.delay(
             job_id=new_job.id, 
-            class_id=personal_class_id
+            class_id=personal_class_id,
+            title=f"Đề tự luyện - {file.filename}",
+            subject="Self-Practice",
+            duration=60,
+            test_type="practice"
         )
 
         # 6. Trả về Response chứa job_id để Frontend mở WebSocket

@@ -60,7 +60,10 @@ def get_exam_details(
             ClassEnrollment.student_id == current_user.id
         ).first()
         if not enrollment:
-            raise PermissionDeniedError("Bạn không thuộc lớp học chứa đề thi này.")
+            # Fallback: Kiểm tra xem đây có phải lớp tự luyện tập (Self-Practice) của chính học sinh không
+            target_class = db.query(Class).filter(Class.id == exam.class_id).first()
+            if not target_class or target_class.subject != "Self-Practice" or target_class.teacher_id != current_user.id:
+                raise PermissionDeniedError("Bạn không thuộc lớp học chứa đề thi này.")
     else:
         # Kiểm tra quyền giáo viên
         _check_teacher_exam_permission(db, exam_id, current_user.id)

@@ -5,9 +5,9 @@ from pydantic import BaseModel, Field, ConfigDict
 # ==========================================
 # Khai báo các Type (Literal) đồng bộ với AI & DB
 # ==========================================
-SubjectType = Literal["Toán", "Vật Lý", "Hóa Học", "Sinh Học", "Tiếng Anh", "IELTS", "HSA", "Khác"]
-TestType = Literal["practice", "exam"]
-ResultVisibilityType = Literal["score_only", "detailed", "after_close"]
+SubjectType = Literal["Toán", "Vật Lý", "Hóa Học", "Sinh Học", "Tiếng Anh", "IELTS", "HSA", "Khác", "Self-Practice"]
+TestType = Literal["practice", "exam", "test"]
+ResultVisibilityType = Literal["hidden", "score_only", "full"]
 
 
 # ==========================================

@@ -40,6 +40,9 @@ export default function DashboardPage() {
 
   const [classesLoading, setClassesLoading] = useState(true);
   const [examsLoading, setExamsLoading] = useState(false);
+  
+  const [selfPracticeExams, setSelfPracticeExams] = useState<ExamData[]>([]);
+  const [selfPracticeLoading, setSelfPracticeLoading] = useState(false);
 
   const fetchClasses = async () => {
     setClassesLoading(true);
@@ -90,6 +93,25 @@ export default function DashboardPage() {
       setExams([]);
     }
   }, [selectedClassId]);
+
+  useEffect(() => {
+    const fetchSelfPractice = async (classId: number) => {
+      setSelfPracticeLoading(true);
+      try {
+        const { data } = await apiClient.get(`/classes/${classId}/exams`);
+        setSelfPracticeExams(data);
+      } catch (e) {
+        console.error("Failed to fetch self practice exams:", e);
+      } finally {
+        setSelfPracticeLoading(false);
+      }
+    };
+    
+    const spClass = classes.find(c => c.subject === "Self-Practice");
+    if (spClass) {
+      fetchSelfPractice(spClass.id);
+    }
+  }, [classes]);
 
   const handleCreateClass = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -252,6 +274,35 @@ export default function DashboardPage() {
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                 {exams.map((exam) => (
+                  <ExamCard key={exam.id} exam={exam as any} role={user.role} />
+                ))}
+              </div>
+            )}
+          </section>
+        )}
+
+        {/* Self-Practice Exams Section (For Students) */}
+        {user.role === "student" && classes.some(c => c.subject === "Self-Practice") && (
+          <section className="space-y-4 border-t border-slate-900 pt-8">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-bold text-brand-400 flex items-center gap-2">
+                <FileText size={20} />
+                Góc Luyện Tập (Đề Tự Tải Lên)
+              </h3>
+            </div>
+            
+            {selfPracticeLoading ? (
+              <div className="text-center py-12"><span className="text-slate-500 text-sm">Đang tải góc luyện tập...</span></div>
+            ) : selfPracticeExams.length === 0 ? (
+              <div className="text-center py-12 bg-slate-900/10 border border-slate-800 rounded-xl">
+                <p className="text-slate-500 text-sm">Bạn chưa tải lên đề tự luyện nào.</p>
+                <Link href="/practice/upload" className="inline-block mt-3 text-brand-400 text-sm hover:underline">
+                  Tải đề thi lên ngay
+                </Link>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                {selfPracticeExams.map((exam) => (
                   <ExamCard key={exam.id} exam={exam as any} role={user.role} />
                 ))}
               </div>

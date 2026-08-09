@@ -92,5 +92,9 @@ class Exam(Base):
         uselist=False
     )
 
+    @property
+    def test_type(self):
+        return self.exam_type
+
     def __repr__(self):
         return f"<Exam(id={self.id}, title='{self.title}', type='{self.exam_type}', class_id={self.class_id})>"

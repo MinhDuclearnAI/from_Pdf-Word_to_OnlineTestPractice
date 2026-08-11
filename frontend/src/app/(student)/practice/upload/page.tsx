@@ -54,12 +54,12 @@ export default function PracticeUploadPage() {
       {/* Main Content */}
       <main className="flex-grow max-w-xl mx-auto w-full px-6 py-12 flex flex-col justify-center space-y-6">
         <div className="text-center space-y-2 mb-4">
-          <div className="p-3 bg-brand-500/10 rounded-full text-brand-500 border border-brand-500/20 w-fit mx-auto mb-1">
-            <Brain size={28} />
+          <div className="p-3.5 bg-brand-500/15 rounded-2xl text-brand-400 border border-brand-500/30 w-fit mx-auto mb-2 shadow-lg">
+            <Brain size={32} />
           </div>
-          <h2 className="text-xl font-bold text-slate-100">Upload Đề Tự Luyện Tập</h2>
-          <p className="text-sm text-slate-400 max-w-sm mx-auto">
-            Hệ thống AI sẽ tự động phân tích đề thi và tạo một bài luyện tập trực tuyến cho bạn.
+          <h2 className="text-2xl font-black text-slate-100">Upload Đề Tự Luyện Tập</h2>
+          <p className="text-sm text-slate-400 max-w-md mx-auto leading-relaxed">
+            Hệ thống AI sẽ tự động bóc tách đề thi (PDF/Word) và thiết lập bài luyện tập trực tuyến 1 trang liền mạch cho bạn.
           </p>
         </div>
 

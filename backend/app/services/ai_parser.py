@@ -9,6 +9,7 @@ from app.config import settings
 from app.schemas.ai_processing import ClassificationResult
 from app.prompts.classify_prompt import CLASSIFY_SYSTEM_PROMPT, get_classification_prompt
 from app.prompts.extract_prompt import EXTRACT_SYSTEM_PROMPT, get_extraction_prompt
+from app.prompts.ielts_extract_prompt import IELTS_EXTRACT_SYSTEM_PROMPT, get_ielts_extraction_prompt
 from app.schemas.question import QuestionSchema, ExamExtractionSchema
 from app.services.schema_validator import safe_json_parse
 from app.core.exceptions import FileParsingError
@@ -61,17 +62,32 @@ class AIParserService:
                 logger.error(f"Lỗi kết nối API khi phân loại tài liệu: {str(e)}")
                 raise FileParsingError("Hệ thống AI hiện đang bận, vui lòng thử lại sau.")
 
-    def extract_questions(self, raw_text: str) -> ExamExtractionSchema:
+    def _split_into_sections(self, raw_text: str) -> List[str]:
         """
-        Quét toàn bộ text của tài liệu và bóc tách thành danh sách các câu hỏi chuẩn JSON.
-        Áp dụng cơ chế Smart Retry: Feed lỗi Pydantic ngược lại LLM để tự sửa sai.
+        Nhận diện và phân tách văn bản theo các mốc Phần / Bài đọc (Passage 1, 2, 3 / Part 1, 2, 3).
+        """
+        import re
+        pattern = r'(?i)(?=(?:READING\s+PASSAGE\s+\d+|PASSAGE\s+\d+|PART\s+\d+|PHẦN\s+[0-9IVX]+))'
+        chunks = re.split(pattern, raw_text)
+        cleaned_chunks = [c.strip() for c in chunks if len(c.strip()) > 80]
+        return cleaned_chunks
+
+    def _extract_single_chunk(self, chunk_text: str, subject: str = "Khác") -> ExamExtractionSchema:
+        """
+        Bóc tách một đoạn văn bản (1 chunk hoặc 1 đề tiêu chuẩn) thành ExamExtractionSchema.
         """
         attempt = 0
         
-        # Khởi tạo ngữ cảnh hội thoại linh hoạt cho phép đẩy thêm log lỗi vào sau này
+        if subject.strip().upper() == "IELTS":
+            sys_prompt = IELTS_EXTRACT_SYSTEM_PROMPT
+            user_prompt = get_ielts_extraction_prompt(chunk_text)
+        else:
+            sys_prompt = EXTRACT_SYSTEM_PROMPT
+            user_prompt = get_extraction_prompt(chunk_text)
+
         messages = [
-            {"role": "system", "content": EXTRACT_SYSTEM_PROMPT},
-            {"role": "user", "content": get_extraction_prompt(raw_text)}
+            {"role": "system", "content": sys_prompt},
+            {"role": "user", "content": user_prompt}
         ]
 
         while attempt < self.max_retries:
@@ -81,41 +97,62 @@ class AIParserService:
                     messages=messages,
                     temperature=0.1,
                     max_tokens=8192,
-                    response_format={"type": "json_object"}  # Đã BỔ SUNG ép kiểu JSON
+                    response_format={"type": "json_object"}
                 )
                 
                 raw_json = response.choices[0].message.content
-                
-                # Gọi hàm helper để validate list các câu hỏi
                 parsed_exam = safe_json_parse(raw_json, ExamExtractionSchema)
-                
-                logger.info(f"Bóc tách thành công {len(parsed_exam.questions)} câu hỏi (sau {attempt + 1} lần gọi).")
                 return parsed_exam
 
             except ValidationError as e:
                 attempt += 1
-                logger.warning(f"Lần {attempt}: Sai format JSON. Lỗi chi tiết:\n{e}")
+                logger.warning(f"Lần {attempt}: Sai format JSON khi bóc tách chunk. Lỗi: {e}")
                 
                 if attempt >= self.max_retries:
                     logger.error("Đã hết số lần thử lại (retries) do sai format Schema liên tục.")
                     raise FileParsingError("Không thể chuẩn hóa dữ liệu câu hỏi từ file tải lên.")
                 
-                # --- [FIX]: SMART RETRY LOGIC ---
-                # Nạp JSON bị lỗi vào context đóng vai trò là "câu trả lời cũ của AI"
                 messages.append({"role": "assistant", "content": raw_json if raw_json else "{}"})
-                
-                # Cung cấp log lỗi từ Pydantic và ép LLM sửa lại
                 error_feedback = (
                     f"Kết quả JSON vừa rồi của bạn bị lỗi cấu trúc (Schema ValidationError):\n{str(e)}\n"
                     f"Dựa vào thông báo lỗi trên, hãy sửa lại JSON cho chuẩn xác. "
                     f"CHỈ TRẢ VỀ JSON, KHÔNG KÈM THEO BẤT KỲ VĂN BẢN GIẢI THÍCH NÀO KHÁC."
                 )
                 messages.append({"role": "user", "content": error_feedback})
-                # ---------------------------------
 
             except Exception as e:
                 logger.error(f"Lỗi API khi bóc tách câu hỏi: {str(e)}", exc_info=True)
                 raise FileParsingError("Lỗi giao tiếp với máy chủ AI.")
+
+    def extract_questions(self, raw_text: str, subject: str = "Khác") -> ExamExtractionSchema:
+        """
+        Bóc tách toàn bộ câu hỏi trong đề thi.
+        Nếu phát hiện đề có nhiều Bài đọc / Phần (như IELTS 3 Passages), tự động bóc tách từng phần
+        để tránh tràn Token và đảm bảo 100% câu hỏi (40 câu) được trích xuất đầy đủ.
+        """
+        sections = self._split_into_sections(raw_text)
+        
+        # Nếu đề thi có từ 2 phần/passage trở lên và văn bản dài
+        if len(sections) >= 2:
+            logger.info(f"Phát hiện {len(sections)} bài đọc/phần riêng biệt. Đang bóc tách theo từng phần...")
+            all_questions = []
+            for idx, sec_text in enumerate(sections):
+                try:
+                    sec_result = self._extract_single_chunk(sec_text, subject)
+                    logger.info(f"Phần {idx + 1}: Bóc tách được {len(sec_result.questions)} câu hỏi.")
+                    all_questions.extend(sec_result.questions)
+                except Exception as e:
+                    logger.warning(f"Lỗi khi bóc tách phần {idx + 1}: {e}")
+            
+            if all_questions:
+                # Đánh lại ID tuần tự q1, q2,... nếu có trùng lặp
+                for i, q in enumerate(all_questions):
+                    q.id = f"q{i + 1}"
+                logger.info(f"Tổng cộng bóc tách thành công {len(all_questions)} câu hỏi từ tất cả các phần.")
+                return ExamExtractionSchema(questions=all_questions)
+
+        # Với đề thông thường hoặc đề 1 phần
+        return self._extract_single_chunk(raw_text, subject)
 
 # Khởi tạo instance duy nhất (Singleton pattern) để import vào Celery Tasks
 ai_parser = AIParserService()

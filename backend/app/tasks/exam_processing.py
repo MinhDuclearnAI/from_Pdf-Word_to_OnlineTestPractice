@@ -262,7 +262,19 @@ def process_exam_upload_task(self, job_id: int, class_id: int, title: str, subje
 
             # 6. Pass 2: Bóc tách từng câu hỏi qua AI
             notification.publish_job_status(job_id, "processing", 60, "AI đang bóc tách từng câu hỏi và gán nhãn...")
-            parsed_exam = ai_parser.extract_questions(document_text)
+            
+            # Tự động nhận diện môn học thực sự (đặc biệt cho Self-Practice)
+            real_subject = subject
+            if subject in ["Self-Practice", "Khác"]:
+                try:
+                    logger.info("Đang tự động nhận diện môn học thực tế...")
+                    classification = ai_parser.classify_document(document_text)
+                    real_subject = classification.subject
+                    logger.info(f"Môn học được nhận diện: {real_subject}")
+                except Exception as e:
+                    logger.warning(f"Lỗi khi nhận diện môn học, fallback về {subject}: {e}")
+
+            parsed_exam = ai_parser.extract_questions(document_text, subject=real_subject)
 
             # 7. Lưu dữ liệu vào Database
             notification.publish_job_status(job_id, "processing", 90, "Đang lưu cấu trúc bài thi vào Database...")
@@ -294,6 +306,13 @@ def process_exam_upload_task(self, job_id: int, class_id: int, title: str, subje
                     elif db_type == "fill_blank":
                         db_type = "fill_in_the_blank"
 
+                    p_ref = q_data.passage_ref
+                    p_title = getattr(q_data, "part_title", None)
+                    if p_title and p_ref and not p_ref.startswith(f"[{p_title}]"):
+                        p_ref = f"[{p_title}]\n\n{p_ref}"
+                    elif p_title and not p_ref:
+                        p_ref = f"[{p_title}]"
+
                     new_question = Question(
                         exam_id=new_exam.id,
                         component_type=db_type,
@@ -301,7 +320,8 @@ def process_exam_upload_task(self, job_id: int, class_id: int, title: str, subje
                         options=q_data.options if q_data.options else [],
                         correct_answer=q_data.correct_answer,
                         score_weight=q_data.score_weight,
-                        passage_ref=q_data.passage_ref,
+                        passage_ref=p_ref,
+                        answer_placeholder=getattr(q_data, "answer_placeholder", None),
                     )
                     db.add(new_question)
 

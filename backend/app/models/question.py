@@ -16,6 +16,16 @@ class ComponentType(str, enum.Enum):
     reading_passage = "reading_passage"       # Đoạn văn đọc hiểu (chứa các câu hỏi con)
     fill_in_the_blank = "fill_in_the_blank"   # Điền vào chỗ trống
     essay = "essay"                           # Tự luận (cần ô text lớn để gõ máy)
+    
+    # IELTS Specific Types
+    true_false_not_given = "true_false_not_given"
+    matching_headings = "matching_headings"
+    matching_features = "matching_features"
+    sentence_completion = "sentence_completion"
+    summary_completion = "summary_completion"
+    table_completion = "table_completion"
+    diagram_label_completion = "diagram_label_completion"
+    multiple_choice_ielts = "multiple_choice_ielts"
 
 
 class Question(Base):

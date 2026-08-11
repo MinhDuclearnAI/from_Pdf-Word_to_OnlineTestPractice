@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import useAuth from "@/hooks/useAuth";
 import apiClient from "@/lib/api-client";
 import SubjectList from "@/components/dashboard/SubjectList";
@@ -7,7 +7,7 @@ import ExamCard from "@/components/dashboard/ExamCard";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import Modal from "@/components/ui/Modal";
-import { GraduationCap, LogOut, BookOpen, FileText, Plus, User as UserIcon } from "lucide-react";
+import { GraduationCap, LogOut, BookOpen, FileText, Plus, User as UserIcon, Mail, Calendar, MapPin, Briefcase } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -43,6 +43,19 @@ export default function DashboardPage() {
   
   const [selfPracticeExams, setSelfPracticeExams] = useState<ExamData[]>([]);
   const [selfPracticeLoading, setSelfPracticeLoading] = useState(false);
+
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const profileMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (profileMenuRef.current && !profileMenuRef.current.contains(event.target as Node)) {
+        setShowProfileMenu(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const fetchClasses = async () => {
     setClassesLoading(true);
@@ -134,6 +147,18 @@ export default function DashboardPage() {
     }
   };
 
+  const handleDeleteSelfPracticeExam = async (examId: number) => {
+    if (!window.confirm("Bạn có chắc chắn muốn xóa đề thi này không? Dữ liệu không thể khôi phục.")) return;
+    try {
+      await apiClient.delete(`/exams/${examId}`);
+      // Cập nhật lại danh sách ngay lập tức
+      setSelfPracticeExams(prev => prev.filter(exam => exam.id !== examId));
+    } catch (error) {
+      console.error("Lỗi khi xóa đề thi:", error);
+      alert("Xóa đề thi thất bại, vui lòng thử lại!");
+    }
+  };
+
   // Show loading screen while auth state is being determined
   if (authLoading) {
     return (
@@ -168,11 +193,54 @@ export default function DashboardPage() {
           </div>
 
           <div className="flex items-center gap-4">
-            <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-slate-900 border border-slate-800 rounded-lg text-xs text-slate-400">
-              <UserIcon size={14} className="text-slate-400" />
-              <span>{user.email}</span>
-              <span className="h-1.5 w-1.5 rounded-full bg-slate-700 mx-1"></span>
-              <span className="uppercase text-brand-400 font-bold">{user.role === "teacher" ? "Giáo viên" : "Học sinh"}</span>
+            <div className="relative" ref={profileMenuRef}>
+              <button
+                onClick={() => setShowProfileMenu(!showProfileMenu)}
+                className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-lg text-xs text-slate-400 cursor-pointer transition-colors"
+              >
+                <UserIcon size={14} className="text-slate-400" />
+                <span>{user.email}</span>
+                <span className="h-1.5 w-1.5 rounded-full bg-slate-700 mx-1"></span>
+                <span className="uppercase text-brand-400 font-bold">{user.role === "teacher" ? "Giáo viên" : "Học sinh"}</span>
+              </button>
+              
+              {showProfileMenu && (
+                <div className="absolute right-0 top-full mt-2 w-72 bg-slate-900 border border-slate-800 rounded-xl shadow-2xl z-50 overflow-hidden transform origin-top-right transition-all">
+                  <div className="p-4 border-b border-slate-800 bg-slate-800/30">
+                    <h4 className="font-bold text-slate-100 text-lg mb-0.5">{user.full_name || "Chưa cập nhật tên"}</h4>
+                    <div className="flex items-center text-slate-400 text-xs">
+                      <Mail size={12} className="mr-1" />
+                      {user.email}
+                    </div>
+                  </div>
+                  <div className="p-4 space-y-3">
+                    <div className="flex items-start gap-3 text-sm">
+                      <div className="mt-0.5 text-brand-400"><Calendar size={16} /></div>
+                      <div>
+                        <p className="text-slate-400 text-xs font-semibold mb-0.5">Ngày sinh</p>
+                        <p className="text-slate-200">{user.date_of_birth ? new Date(user.date_of_birth).toLocaleDateString('vi-VN') : "Chưa cập nhật"}</p>
+                      </div>
+                    </div>
+                    {user.role === "student" ? (
+                      <div className="flex items-start gap-3 text-sm">
+                        <div className="mt-0.5 text-brand-400"><MapPin size={16} /></div>
+                        <div>
+                          <p className="text-slate-400 text-xs font-semibold mb-0.5">Trường học</p>
+                          <p className="text-slate-200">{user.school || "Chưa cập nhật"}</p>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-start gap-3 text-sm">
+                        <div className="mt-0.5 text-brand-400"><Briefcase size={16} /></div>
+                        <div>
+                          <p className="text-slate-400 text-xs font-semibold mb-0.5">Nơi công tác</p>
+                          <p className="text-slate-200">{user.workplace || "Chưa cập nhật"}</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
             <button
               onClick={logout}
@@ -303,7 +371,7 @@ export default function DashboardPage() {
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                 {selfPracticeExams.map((exam) => (
-                  <ExamCard key={exam.id} exam={exam as any} role={user.role} />
+                  <ExamCard key={exam.id} exam={exam as any} role={user.role} onDelete={handleDeleteSelfPracticeExam} />
                 ))}
               </div>
             )}

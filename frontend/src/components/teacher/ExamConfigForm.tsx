@@ -8,6 +8,7 @@ interface ExamConfigFormProps {
     open_at?: string;
     close_at?: string;
     result_visibility: string;
+    display_mode?: string;
   };
   onSubmit: (config: any) => void;
   loading?: boolean;
@@ -22,6 +23,7 @@ export const ExamConfigForm: React.FC<ExamConfigFormProps> = ({ initialConfig, o
     initialConfig.close_at ? new Date(initialConfig.close_at).toISOString().slice(0, 16) : ""
   );
   const [resultVisibility, setResultVisibility] = useState(initialConfig.result_visibility || "detailed");
+  const [displayMode, setDisplayMode] = useState(initialConfig.display_mode || "continuous");
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,11 +32,12 @@ export const ExamConfigForm: React.FC<ExamConfigFormProps> = ({ initialConfig, o
       open_at: openAt ? new Date(openAt).toISOString() : null,
       close_at: closeAt ? new Date(closeAt).toISOString() : null,
       result_visibility: resultVisibility,
+      display_mode: displayMode,
     });
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-5 bg-slate-900/40 p-6 border border-slate-800 rounded-xl">
+    <form onSubmit={handleSubmit} className="space-y-5 bg-slate-900/60 p-6 border border-slate-800 rounded-2xl shadow-xl">
       <h3 className="text-base font-bold text-slate-100 mb-2">Cấu hình bài kiểm tra</h3>
       
       <Input
@@ -61,19 +64,35 @@ export const ExamConfigForm: React.FC<ExamConfigFormProps> = ({ initialConfig, o
         />
       </div>
 
-      <div className="w-full">
-        <label className="block text-sm font-medium text-slate-300 mb-1.5">
-          Quyền xem kết quả của học sinh
-        </label>
-        <select
-          value={resultVisibility}
-          onChange={(e) => setResultVisibility(e.target.value)}
-          className="w-full px-4 py-2.5 bg-slate-900 border border-slate-800 rounded-lg text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
-        >
-          <option value="detailed">Xem điểm & xem chi tiết đáp án ngay</option>
-          <option value="score_only">Chỉ xem điểm, ẩn đáp án</option>
-          <option value="after_close">Ẩn hoàn toàn (Giáo viên công bố sau)</option>
-        </select>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="w-full">
+          <label className="block text-sm font-medium text-slate-300 mb-1.5">
+            Quyền xem kết quả của học sinh
+          </label>
+          <select
+            value={resultVisibility}
+            onChange={(e) => setResultVisibility(e.target.value)}
+            className="w-full px-4 py-2.5 bg-slate-900 border border-slate-800 rounded-lg text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+          >
+            <option value="detailed">Xem điểm & xem chi tiết đáp án ngay</option>
+            <option value="score_only">Chỉ xem điểm, ẩn đáp án</option>
+            <option value="after_close">Ẩn hoàn toàn (Giáo viên công bố sau)</option>
+          </select>
+        </div>
+
+        <div className="w-full">
+          <label className="block text-sm font-medium text-slate-300 mb-1.5">
+            Chế độ hiển thị khi làm bài
+          </label>
+          <select
+            value={displayMode}
+            onChange={(e) => setDisplayMode(e.target.value)}
+            className="w-full px-4 py-2.5 bg-slate-900 border border-slate-800 rounded-lg text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+          >
+            <option value="continuous">Cuộn toàn bộ trên 1 trang (Mặc định)</option>
+            <option value="single">Chia từng trang từng câu</option>
+          </select>
+        </div>
       </div>
 
       <Button type="submit" variant="primary" className="w-full" disabled={loading}>

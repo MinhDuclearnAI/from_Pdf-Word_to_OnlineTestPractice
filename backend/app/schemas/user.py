@@ -75,6 +75,10 @@ class UserOut(UserBase):
     Tuyệt đối không chứa trường 'password' hay 'hashed_password' để đảm bảo an toàn.
     """
     id: int = Field(..., description="ID duy nhất của người dùng")
+    full_name: Optional[str] = None
+    date_of_birth: Optional[date] = None
+    school: Optional[str] = None
+    workplace: Optional[str] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 

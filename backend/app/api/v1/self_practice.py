@@ -110,10 +110,11 @@ def upload_self_practice_exam(
 
         # 5. Đẩy Task xử lý nền vào Celery Worker
         # Bổ sung các tham số mặc định cho đề tự luyện để khớp với Task Signature
+        title_without_ext = os.path.splitext(file.filename)[0]
         process_exam_upload_task.delay(
             job_id=new_job.id, 
             class_id=personal_class_id,
-            title=f"Đề tự luyện - {file.filename}",
+            title=f"Đề tự luyện - {title_without_ext}",
             subject="Self-Practice",
             duration=60,
             test_type="practice"

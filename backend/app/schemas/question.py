@@ -9,7 +9,15 @@ ComponentType = Literal[
     "math_equation", 
     "reading_passage",
     "fill_in_the_blank",
-    "essay"
+    "essay",
+    "true_false_not_given",
+    "matching_headings",
+    "matching_features",
+    "sentence_completion",
+    "summary_completion",
+    "table_completion",
+    "diagram_label_completion",
+    "multiple_choice_ielts"
 ]
 
 
@@ -49,6 +57,10 @@ class QuestionSchema(BaseModel):
     passage_ref: Optional[str] = Field(
         None, 
         description="Nội dung đoạn văn bài đọc (chỉ dành cho type 'reading_passage')"
+    )
+    part_title: Optional[str] = Field(
+        None,
+        description="Tiêu đề của Phần / Bài đọc (ví dụ: 'READING PASSAGE 1')"
     )
     answer_placeholder: Optional[str] = Field(
         None, 
@@ -105,6 +117,18 @@ class QuestionSchema(BaseModel):
             "fill-in-the-blank": "fill_in_the_blank",
             "writing": "essay",
             "latex_formula": "math_equation",
+            # IELTS specific aliases
+            "tfng": "true_false_not_given",
+            "true/false/not given": "true_false_not_given",
+            "yes/no/not given": "true_false_not_given",
+            "ynng": "true_false_not_given",
+            "matching headings": "matching_headings",
+            "matching features": "matching_features",
+            "sentence completion": "sentence_completion",
+            "summary completion": "summary_completion",
+            "table completion": "table_completion",
+            "diagram label completion": "diagram_label_completion",
+            "multiple choice ielts": "multiple_choice_ielts"
         }
         if isinstance(raw_type, str):
             data["type"] = type_aliases.get(raw_type.strip().lower(), raw_type.strip().lower())
@@ -119,20 +143,47 @@ class QuestionSchema(BaseModel):
 
 class ExamExtractionSchema(BaseModel):
     """
-    Schema bọc ngoài cùng cho mảng câu hỏi trả về từ LLM.
-    Mẹo bọc object {"questions": [...]} giúp LLM ít bị lỗi cú pháp JSON hơn.
+    Schema bọc ngoài cùng cho kết quả trả về từ LLM.
+    Hỗ trợ nhận diện cả cấu trúc 'sections' (cho bài đọc IELTS/Đọc hiểu)
+    và cấu trúc phẳng 'questions'.
     """
     questions: List[QuestionSchema] = Field(
-        ..., 
+        default_factory=list, 
         description="Danh sách các câu hỏi đã được AI bóc tách và phân loại"
     )
 
     @model_validator(mode="before")
     @classmethod
-    def wrap_legacy_question_list(cls, value: Any) -> Any:
-        """Accept a bare list from older prompts while preserving one output model."""
+    def wrap_and_flatten_sections(cls, value: Any) -> Any:
+        """Tự động phân giải cả dạng list, dạng sections hoặc dạng questions."""
         if isinstance(value, list):
             return {"questions": value}
+        
+        if not isinstance(value, dict):
+            return value
+
+        # Trường hợp LLM trả về cấu trúc sections: [...]
+        if "sections" in value and isinstance(value["sections"], list):
+            flattened_questions = []
+            for sec in value["sections"]:
+                if not isinstance(sec, dict):
+                    continue
+                sec_title = sec.get("section_title") or sec.get("title") or sec.get("part")
+                passage_text = sec.get("passage_text") or sec.get("passage") or sec.get("reading_passage") or sec.get("passage_ref")
+                sec_questions = sec.get("questions") or sec.get("question_list") or []
+                
+                for q in sec_questions:
+                    if isinstance(q, dict):
+                        q_copy = dict(q)
+                        if passage_text and not q_copy.get("passage_ref"):
+                            q_copy["passage_ref"] = passage_text
+                        if sec_title and not q_copy.get("part_title"):
+                            q_copy["part_title"] = sec_title
+                        flattened_questions.append(q_copy)
+
+            if flattened_questions:
+                return {"questions": flattened_questions}
+
         return value
 
 
@@ -150,6 +201,7 @@ class QuestionBase(BaseModel):
     correct_answer: Optional[str] = None
     score_weight: float = 1.0
     passage_ref: Optional[str] = None
+    part_title: Optional[str] = None
     answer_placeholder: Optional[str] = None
 
 
@@ -170,6 +222,7 @@ class QuestionUpdate(BaseModel):
     correct_answer: Optional[str] = None
     score_weight: Optional[float] = None
     passage_ref: Optional[str] = None
+    part_title: Optional[str] = None
     answer_placeholder: Optional[str] = None
 
 

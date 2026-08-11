@@ -210,6 +210,19 @@ def get_class_exams(
 
     exams = db.query(Exam).filter(Exam.class_id == class_id).all()
     
+    student_scores = {}
+    if current_user.role == "student" and exams:
+        from app.models.submission import Submission
+        submissions = db.query(Submission).filter(
+            Submission.student_id == current_user.id,
+            Submission.exam_id.in_([e.id for e in exams]),
+            Submission.status == "completed"
+        ).all()
+        for sub in submissions:
+            if sub.score is not None:
+                if sub.exam_id not in student_scores or sub.score > student_scores[sub.exam_id]:
+                    student_scores[sub.exam_id] = float(sub.score)
+
     import datetime
     now = datetime.datetime.utcnow()
     results = []
@@ -228,7 +241,8 @@ def get_class_exams(
                 subject=e.subject,
                 test_type=e.exam_type.value,
                 duration=e.duration or 0,
-                is_active=is_active
+                is_active=is_active,
+                score=student_scores.get(e.id)
             )
         )
     return results

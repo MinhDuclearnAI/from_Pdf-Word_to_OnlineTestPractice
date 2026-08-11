@@ -52,11 +52,11 @@ export default function ExamPlayPage() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col">
       {/* Header with Exit Link */}
-      <header className="border-b border-slate-900 bg-slate-900/10 py-3">
-        <div className="max-w-7xl mx-auto px-6 flex items-center">
+      <header className="border-b border-slate-800/80 bg-slate-900/60 backdrop-blur py-2.5 px-4 md:px-6 sticky top-0 z-30">
+        <div className="max-w-[1920px] mx-auto flex items-center justify-between">
           <Link
             href={`/exam/${examId}`}
-            className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-200 transition-colors"
+            className="flex items-center gap-1.5 text-xs font-semibold text-slate-300 hover:text-brand-400 transition-colors bg-slate-800/60 hover:bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-700/50"
             onClick={(e) => {
               if (!confirm("Bạn có chắc chắn muốn thoát khỏi phòng thi? Bài làm chưa nộp sẽ chỉ được lưu nháp.")) {
                 e.preventDefault();
@@ -65,11 +65,14 @@ export default function ExamPlayPage() {
           >
             <ChevronLeft size={16} /> Thoát phòng thi
           </Link>
+          <div className="text-xs text-slate-400 font-medium hidden sm:block">
+            Phòng thi trực tuyến • <span className="text-brand-400 font-bold">{exam.title}</span>
+          </div>
         </div>
       </header>
 
-      {/* Main Exam Player View */}
-      <main className="flex-grow max-w-7xl mx-auto w-full px-6 py-6 flex flex-col">
+      {/* Main Exam Player View - Full Screen Workspace */}
+      <main className="flex-grow w-full max-w-[1920px] mx-auto px-3 md:px-6 py-4 flex flex-col">
         <ExamPlayer exam={exam} questions={questions} />
       </main>
     </div>

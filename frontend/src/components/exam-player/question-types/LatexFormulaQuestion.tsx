@@ -49,7 +49,7 @@ export const LatexFormulaQuestion: React.FC<LatexFormulaQuestionProps> = ({
       </div>
 
       {options && options.length > 0 ? (
-        <div className="space-y-3">
+        <div className="space-y-2.5">
           {options.map((option, index) => {
             const optionLetter = String.fromCharCode(65 + index);
             const isSelected = selectedAnswer === optionLetter || selectedAnswer === option;
@@ -60,22 +60,22 @@ export const LatexFormulaQuestion: React.FC<LatexFormulaQuestionProps> = ({
                 type="button"
                 disabled={disabled}
                 onClick={() => onChange(optionLetter)}
-                className={`w-full flex items-center gap-3.5 px-4 py-3.5 rounded-lg border text-left transition-all duration-200 ${
+                className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl border text-left transition-all duration-200 ${
                   isSelected
-                    ? "bg-brand-500/10 border-brand-500 text-slate-100 font-medium ring-1 ring-brand-500"
-                    : "bg-slate-900/40 border-slate-800 text-slate-300 hover:bg-slate-800/40 hover:border-slate-700"
+                    ? "bg-brand-500/15 border-brand-500 text-slate-100 font-semibold ring-2 ring-brand-500/30 shadow-md"
+                    : "bg-slate-900/60 border-slate-800/90 text-slate-200 hover:bg-slate-800/70 hover:border-slate-700"
                 }`}
               >
                 <span
-                  className={`flex items-center justify-center w-6 h-6 rounded-full border text-xs font-semibold shrink-0 ${
+                  className={`flex items-center justify-center w-7 h-7 rounded-full border text-xs font-bold shrink-0 transition-all ${
                     isSelected
-                      ? "bg-brand-500 border-brand-500 text-white"
-                      : "border-slate-600 bg-slate-800 text-slate-400"
+                      ? "bg-brand-600 border-brand-500 text-white shadow"
+                      : "border-slate-700 bg-slate-800 text-slate-400"
                   }`}
                 >
                   {optionLetter}
                 </span>
-                <span className="leading-relaxed">{renderTextWithLatex(option)}</span>
+                <span className="leading-relaxed text-sm md:text-base">{renderTextWithLatex(option)}</span>
               </button>
             );
           })}

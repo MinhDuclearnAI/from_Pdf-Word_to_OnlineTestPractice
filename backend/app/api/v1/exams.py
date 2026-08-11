@@ -182,7 +182,7 @@ def get_exam_statistics(
 def delete_exam(
     exam_id: int, 
     db: Session = Depends(get_db), 
-    current_user: User = Depends(get_current_teacher)
+    current_user: User = Depends(get_current_user)
 ):
     """
     Xóa một đề thi khỏi hệ thống. Yêu cầu quyền Giáo viên quản lý lớp.

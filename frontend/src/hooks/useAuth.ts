@@ -6,6 +6,10 @@ export interface User {
   id: number;
   email: string;
   role: "student" | "teacher";
+  full_name?: string;
+  date_of_birth?: string;
+  school?: string;
+  workplace?: string;
   created_at: string;
 }
 

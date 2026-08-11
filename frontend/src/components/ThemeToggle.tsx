@@ -29,10 +29,10 @@ export default function ThemeToggle() {
   return (
     <button
       onClick={toggleTheme}
-      className="p-2 rounded-full bg-slate-800 text-slate-300 hover:text-brand-400 hover:bg-slate-700 transition-colors border border-slate-700 shadow-lg flex items-center justify-center fixed bottom-6 right-6 z-50"
-      title={isLightMode ? "Chuyển sang Giao diện Tối" : "Chuyển sang Giao diện Sáng"}
+      className="p-2.5 rounded-full bg-slate-900/90 text-slate-200 hover:text-brand-300 hover:bg-slate-800 hover:border-brand-500/50 transition-all border border-slate-700/80 shadow-2xl flex items-center justify-center fixed bottom-6 right-6 z-50 backdrop-blur"
+      title={isLightMode ? "Chuyển sang Giao diện Đỏ Đô Tối" : "Chuyển sang Giao diện Sáng"}
     >
-      {isLightMode ? <Moon size={24} /> : <Sun size={24} />}
+      {isLightMode ? <Moon size={20} /> : <Sun size={20} />}
     </button>
   );
 }

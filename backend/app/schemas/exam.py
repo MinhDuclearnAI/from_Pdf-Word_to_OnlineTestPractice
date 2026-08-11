@@ -101,4 +101,9 @@ class ExamSummary(BaseModel):
         description="Trạng thái đề thi đang mở hay đã đóng (Tính toán runtime)"
     )
 
+    score: Optional[float] = Field(
+        None,
+        description="Điểm số cao nhất/gần nhất của học sinh (nếu đã làm)"
+    )
+
     model_config = ConfigDict(from_attributes=True)

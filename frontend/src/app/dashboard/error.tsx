@@ -14,10 +14,10 @@ export default function DashboardError({
   }, [error]);
 
   return (
-    <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-8 text-center">
+    <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-8 text-center">
       <div className="max-w-lg w-full bg-red-950/30 border border-red-800/50 rounded-2xl p-8">
         <h2 className="text-2xl font-bold text-red-400 mb-4">Đã xảy ra lỗi</h2>
-        <pre className="text-left text-xs text-red-300 bg-slate-900 rounded-lg p-4 overflow-auto max-h-64 mb-6 whitespace-pre-wrap">
+        <pre className="text-left text-xs text-red-300 bg-white rounded-lg p-4 overflow-auto max-h-64 mb-6 whitespace-pre-wrap">
           {error?.message || "Unknown error"}
           {"\n\n"}
           {error?.stack}

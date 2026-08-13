@@ -39,7 +39,7 @@ export const FillBlankInput: React.FC<FillBlankInputProps> = ({
     const singleAns = typeof selectedAnswer === "string" ? selectedAnswer : "";
     return (
       <div className="w-full">
-        <h3 className="text-base md:text-lg font-semibold text-slate-100 mb-3 whitespace-pre-wrap leading-relaxed">
+        <h3 className="text-base md font-semibold text-slate-800 mb-3 whitespace-pre-wrap leading-relaxed">
           {questionText}
         </h3>
         <input
@@ -48,7 +48,7 @@ export const FillBlankInput: React.FC<FillBlankInputProps> = ({
           value={singleAns}
           onChange={(e) => onChange(e.target.value)}
           placeholder="Nhập câu trả lời điền khuyết..."
-          className="w-full max-w-md px-4 py-2.5 bg-slate-900/80 border border-slate-800 rounded-xl text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:border-brand-500 focus:ring-brand-500/30 transition-all shadow-inner"
+          className="w-full max-w-md px-4 py-2.5 bg-white/80 border border-slate-200 rounded-xl text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus focus:ring-brand-500/30 transition-all shadow-inner"
         />
       </div>
     );
@@ -56,7 +56,7 @@ export const FillBlankInput: React.FC<FillBlankInputProps> = ({
 
   return (
     <div className="w-full">
-      <div className="text-base md:text-lg font-semibold text-slate-100 mb-4 leading-relaxed flex flex-wrap items-center gap-y-3">
+      <div className="text-base md font-semibold text-slate-800 mb-4 leading-relaxed flex flex-wrap items-center gap-y-3">
         {parts.map((part, index) => (
           <React.Fragment key={index}>
             <span className="whitespace-pre-wrap">{part}</span>
@@ -67,7 +67,7 @@ export const FillBlankInput: React.FC<FillBlankInputProps> = ({
                 value={answersList[index] || ""}
                 onChange={(e) => handleInputChange(index, e.target.value)}
                 placeholder={`(${index + 1})`}
-                className="mx-2 px-3.5 py-1.5 bg-slate-900/90 border border-slate-700/80 rounded-lg text-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 text-center font-bold text-base min-w-[110px] w-auto max-w-[220px] transition-all shadow"
+                className="mx-2 px-3.5 py-1.5 bg-white/90 border border-slate-300/80 rounded-lg text-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500 focus text-center font-bold text-base min-w-[110px] w-auto max-w-[220px] transition-all shadow"
               />
             )}
           </React.Fragment>

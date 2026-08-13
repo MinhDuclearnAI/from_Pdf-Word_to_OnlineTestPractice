@@ -82,11 +82,11 @@ function NewExamContent() {
   const redirectPath = selectedClassId ? `/classes/${selectedClassId}` : "/dashboard";
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between">
+    <div className="min-h-screen bg-slate-50 text-slate-800 flex flex-col justify-between">
       {/* Header */}
-      <header className="border-b border-slate-900 bg-slate-900/20 backdrop-blur-md">
+      <header className="border-b border-slate-200 bg-white/20 backdrop-blur-md">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <Link href={redirectPath} className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-200 transition-colors">
+          <Link href={redirectPath} className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-700 transition-colors">
             <ChevronLeft size={16} /> Quay lại
           </Link>
           <div className="flex items-center gap-2">
@@ -102,8 +102,8 @@ function NewExamContent() {
           <div className="p-3 bg-brand-500/10 rounded-full text-brand-500 border border-brand-500/20 w-fit mx-auto mb-1">
             <Brain size={28} />
           </div>
-          <h2 className="text-xl font-bold text-slate-100">Tạo Đề Thi Mới Bằng AI</h2>
-          <p className="text-sm text-slate-400 max-w-sm mx-auto">
+          <h2 className="text-xl font-bold text-slate-800">Tạo Đề Thi Mới Bằng AI</h2>
+          <p className="text-sm text-slate-500 max-w-sm mx-auto">
             Nhập cấu hình đề thi, sau đó tải lên tệp PDF hoặc Word đề bài để hệ thống AI tiến hành bóc tách.
           </p>
         </div>
@@ -115,7 +115,7 @@ function NewExamContent() {
         )}
 
         {!jobId ? (
-          <form className="space-y-4 bg-slate-900/40 p-6 border border-slate-800 rounded-xl">
+          <form className="space-y-4 bg-white/40 p-6 border border-slate-200 rounded-xl">
             <Input
               label="Tiêu đề đề thi / bài kiểm tra"
               value={title}
@@ -127,11 +127,11 @@ function NewExamContent() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="w-full">
-                <label className="block text-sm font-medium text-slate-300 mb-1.5">Lớp học chỉ định</label>
+                <label className="block text-sm font-medium text-slate-600 mb-1.5">Lớp học chỉ định</label>
                 <select
                   value={selectedClassId}
                   onChange={(e) => setSelectedClassId(e.target.value)}
-                  className="w-full px-4 py-2.5 bg-slate-900 border border-slate-800 rounded-lg text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                  className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
                   required
                   disabled={loading}
                 >
@@ -155,11 +155,11 @@ function NewExamContent() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="w-full">
-                <label className="block text-sm font-medium text-slate-300 mb-1.5">Môn học</label>
+                <label className="block text-sm font-medium text-slate-600 mb-1.5">Môn học</label>
                 <select
                   value={subject}
                   onChange={(e) => setSubject(e.target.value)}
-                  className="w-full px-4 py-2.5 bg-slate-900 border border-slate-800 rounded-lg text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                  className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
                   required
                   disabled={loading}
                 >
@@ -178,11 +178,11 @@ function NewExamContent() {
               </div>
 
               <div className="w-full">
-                <label className="block text-sm font-medium text-slate-300 mb-1.5">Dạng bài thi</label>
+                <label className="block text-sm font-medium text-slate-600 mb-1.5">Dạng bài thi</label>
                 <select
                   value={testType}
                   onChange={(e) => setTestType(e.target.value)}
-                  className="w-full px-4 py-2.5 bg-slate-900 border border-slate-800 rounded-lg text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                  className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
                   disabled={loading}
                 >
                   <option value="exam">Đề kiểm tra chính thức (Exam)</option>
@@ -192,8 +192,8 @@ function NewExamContent() {
               </div>
             </div>
 
-            <div className="border-t border-slate-800/80 pt-6">
-              <label className="block text-sm font-medium text-slate-400 mb-3">Tải tệp đề kiểm tra</label>
+            <div className="border-t border-slate-200/80 pt-6">
+              <label className="block text-sm font-medium text-slate-500 mb-3">Tải tệp đề kiểm tra</label>
               <FileDropzone onFileSelect={handleFileSelect} disabled={loading || !title || !selectedClassId} />
             </div>
           </form>
@@ -212,7 +212,7 @@ function NewExamContent() {
         )}
       </main>
 
-      <footer className="max-w-7xl mx-auto w-full px-6 py-8 border-t border-slate-900 text-center text-xs text-slate-500">
+      <footer className="max-w-7xl mx-auto w-full px-6 py-8 border-t border-slate-200 text-center text-xs text-slate-500">
         AI Exam Platform • Trợ lý bóc tách tệp PDF/Word.
       </footer>
     </div>
@@ -222,8 +222,8 @@ function NewExamContent() {
 export default function NewExamPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
-        <span className="text-slate-400">Đang tải...</span>
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <span className="text-slate-500">Đang tải...</span>
       </div>
     }>
       <NewExamContent />

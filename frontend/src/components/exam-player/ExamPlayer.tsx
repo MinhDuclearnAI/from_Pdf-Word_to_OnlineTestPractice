@@ -3,11 +3,10 @@ import { useExamStore } from "@/store/examStore";
 import { useExamDraft } from "@/hooks/useExamDraft";
 import QuestionRenderer from "./QuestionRenderer";
 import CountdownTimer from "./CountdownTimer";
-import QuestionNavigator from "./QuestionNavigator";
 import SubmitConfirmModal from "./SubmitConfirmModal";
 import ReadingSplitScreen from "./question-types/ReadingSplitScreen";
 import Button from "../ui/Button";
-import { ChevronLeft, ChevronRight, Flag, Send, LayoutList, BookOpen, Layers } from "lucide-react";
+import { ChevronLeft, ChevronRight, Flag, LayoutGrid, X, FileText } from "lucide-react";
 import apiClient from "@/lib/api-client";
 import { useRouter } from "next/navigation";
 
@@ -28,9 +27,10 @@ interface ExamPlayerProps {
     answer_placeholder?: string;
     [key: string]: any;
   }>;
+  examId: string | string[];
 }
 
-export const ExamPlayer: React.FC<ExamPlayerProps> = ({ exam, questions }) => {
+export const ExamPlayer: React.FC<ExamPlayerProps> = ({ exam, questions, examId }) => {
   const router = useRouter();
   const {
     answers,
@@ -46,24 +46,28 @@ export const ExamPlayer: React.FC<ExamPlayerProps> = ({ exam, questions }) => {
 
   const { forceSave } = useExamDraft(exam.id);
   const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false);
-  const [viewMode, setViewMode] = useState<"continuous" | "single">("continuous");
   const [activePartIndex, setActivePartIndex] = useState<number>(0);
+  const [showGrid, setShowGrid] = useState(false); // Bật tắt danh sách tất cả câu hỏi
 
   useEffect(() => {
     initializeStore(exam.duration);
   }, [exam, initializeStore]);
 
-  // Phân tích và nhóm câu hỏi theo Phần / Bài đọc (Passage Groups) nếu có
   const passageGroups = useMemo(() => {
     if (!questions || questions.length === 0) return [];
 
-    const hasAnyPassage = questions.some(
-      (q) => q.passage_ref && q.passage_ref.trim().length > 0
-    );
+    // Chỉ kích hoạt chế độ Split Screen nếu có passage_ref thực sự dài (>= 40 ký tự) 
+    // hoặc môn học là IELTS và có chia phần. Tránh việc AI nhận nhầm tiêu đề thành passage.
+    const isIELTS = exam?.subject?.toUpperCase() === "IELTS";
+    const hasValidPassage = questions.some((q) => {
+      const pText = q.passage_ref?.trim() || "";
+      const isJustTitle = pText.startsWith("[") && pText.endsWith("]") && pText.length < 40;
+      return pText.length > 40 && !isJustTitle;
+    });
 
-    if (!hasAnyPassage) return [];
+    // Nếu không phải IELTS và không có bài đọc nào đủ dài, thì hiển thị chế độ 1 cột (Standard)
+    if (!hasValidPassage && !isIELTS) return [];
 
-    // Nhóm các câu hỏi có chung passage_ref hoặc part_title
     const groups: Array<{
       title: string;
       passageText: string;
@@ -82,12 +86,12 @@ export const ExamPlayer: React.FC<ExamPlayerProps> = ({ exam, questions }) => {
       }
 
       if (!extractedTitle && cleanPassageText) {
-        extractedTitle = `Bài đọc ${groups.length + 1}`;
+        extractedTitle = `Passage ${groups.length + 1}`;
       }
 
       if (groups.length === 0) {
         groups.push({
-          title: extractedTitle || "Câu hỏi",
+          title: extractedTitle || "Questions",
           passageText: cleanPassageText,
           questions: [{ item: q, originalIndex: idx }],
         });
@@ -101,7 +105,7 @@ export const ExamPlayer: React.FC<ExamPlayerProps> = ({ exam, questions }) => {
           lastGroup.questions.push({ item: q, originalIndex: idx });
         } else {
           groups.push({
-            title: extractedTitle || `Bài đọc ${groups.length + 1}`,
+            title: extractedTitle || `Passage ${groups.length + 1}`,
             passageText: cleanPassageText,
             questions: [{ item: q, originalIndex: idx }],
           });
@@ -114,28 +118,21 @@ export const ExamPlayer: React.FC<ExamPlayerProps> = ({ exam, questions }) => {
 
   if (!questions || questions.length === 0) {
     return (
-      <div className="text-center py-12">
-        <p className="text-slate-400">Không có câu hỏi nào trong đề thi này.</p>
+      <div className="h-full flex items-center justify-center">
+        <p className="text-slate-500">Không có câu hỏi nào trong đề thi này.</p>
       </div>
     );
   }
 
-  const currentQuestion = questions[currentIndex];
-  const qId = String(currentQuestion.id);
-
   const handleNext = () => {
     if (currentIndex < questions.length - 1) {
-      const nextIdx = currentIndex + 1;
-      setCurrentIndex(nextIdx);
-      scrollToQuestion(nextIdx, String(questions[nextIdx].id));
+      scrollToQuestion(currentIndex + 1);
     }
   };
 
   const handlePrev = () => {
     if (currentIndex > 0) {
-      const prevIdx = currentIndex - 1;
-      setCurrentIndex(prevIdx);
-      scrollToQuestion(prevIdx, String(questions[prevIdx].id));
+      scrollToQuestion(currentIndex - 1);
     }
   };
 
@@ -143,15 +140,16 @@ export const ExamPlayer: React.FC<ExamPlayerProps> = ({ exam, questions }) => {
     setAnswer(String(questionId), ans);
   };
 
-  const calculateAnsweredCount = () => {
-    return Object.keys(answers).filter(
-      (key) => answers[key] !== undefined && answers[key] !== null && answers[key] !== ""
-    ).length;
+  const calculateAnsweredCount = (groupQuestions?: Array<{item: any}>) => {
+    const targetQuestions = groupQuestions ? groupQuestions.map(g => g.item) : questions;
+    return targetQuestions.filter(q => {
+      const ans = answers[String(q.id)];
+      return ans !== undefined && ans !== null && ans !== "";
+    }).length;
   };
 
-  const scrollToQuestion = (index: number, targetQId: string) => {
+  const scrollToQuestion = (index: number) => {
     setCurrentIndex(index);
-    // Nếu đang ở bài đọc IELTS theo Part, tự động chuyển Tab sang Part chứa câu hỏi đó
     if (passageGroups.length > 1) {
       const partIdx = passageGroups.findIndex((g) =>
         g.questions.some((qObj) => qObj.originalIndex === index)
@@ -160,11 +158,9 @@ export const ExamPlayer: React.FC<ExamPlayerProps> = ({ exam, questions }) => {
         setActivePartIndex(partIdx);
       }
     }
-
     setTimeout(() => {
-      const el =
-        document.getElementById(`question-card-${targetQId}`) ||
-        document.getElementById(`question-card-${index}`);
+      const targetQId = String(questions[index].id);
+      const el = document.getElementById(`question-card-${targetQId}`) || document.getElementById(`question-card-${index}`);
       if (el) {
         el.scrollIntoView({ behavior: "smooth", block: "start" });
       }
@@ -190,90 +186,73 @@ export const ExamPlayer: React.FC<ExamPlayerProps> = ({ exam, questions }) => {
   };
 
   const isIELTSReadingFormat = passageGroups.length > 0;
-  const isSingleQuestionMode = exam.display_mode === "single";
+  const activeGroup = isIELTSReadingFormat ? passageGroups[activePartIndex] : null;
 
   return (
-    <div className="w-full flex flex-col lg:flex-row gap-5 items-start">
-      {/* Main Player Workspace */}
-      <div className="flex-grow w-full flex flex-col justify-between min-h-[650px]">
-        {/* Exam Header */}
-        <div className="flex flex-wrap items-center justify-between gap-4 mb-4 bg-slate-900/70 p-4 md:p-5 border border-slate-800/80 rounded-2xl shadow-xl backdrop-blur">
-          <div>
-            <h2 className="text-xl md:text-2xl font-bold text-slate-100">{exam.title}</h2>
-            <div className="flex items-center gap-3 mt-1.5 text-xs text-slate-400">
-              <span>
-                Tổng số: <strong className="text-slate-200">{questions.length} câu</strong>
-              </span>
-              <span>•</span>
-              <span>
-                Đã làm: <strong className="text-brand-400">{calculateAnsweredCount()}</strong>/{questions.length}
-              </span>
+    <div className="flex flex-col h-full w-full bg-slate-100 font-sans relative">
+      {/* 1. HEADER COPIED FROM DOL IELTS (CLEAN) */}
+      <header className="flex-shrink-0 h-16 px-4 md:px-6 bg-white border-b border-slate-200 flex items-center justify-between z-30 shadow-sm">
+        <div className="flex items-center gap-4 md:gap-6">
+          <button 
+            onClick={() => {
+              if (confirm("Bạn có chắc chắn muốn thoát khỏi phòng thi? Bài làm chưa nộp sẽ chỉ được lưu nháp.")) {
+                router.push("/dashboard");
+              }
+            }}
+            className="p-2 rounded-xl border border-slate-200 text-slate-500 hover transition-colors"
+            title="Thoát"
+          >
+            <X size={20} />
+          </button>
+          
+          <div className="flex items-center gap-1 md:gap-2">
+            <div className="w-8 h-8 rounded-full bg-brand-600 flex items-center justify-center text-white font-bold">
+              AI
+            </div>
+            <div className="font-black text-xl tracking-tight hidden sm:block text-slate-800">
+              Exam<span className="text-brand-600">Platform</span>
             </div>
           </div>
-
-          <div className="flex items-center gap-3">
-            <CountdownTimer onTimeUp={handleSubmit} />
+          
+          <div className="border-l border-slate-200 pl-4 md:pl-6">
+            <p className="text-xs text-slate-500 font-semibold uppercase tracking-wider mb-0.5">
+              Làm bài
+            </p>
+            <h1 className="text-sm md font-bold text-slate-800 truncate max-w-[200px] sm:max-w-md lg:max-w-xl">
+              {exam.title}
+            </h1>
           </div>
         </div>
 
-        {/* IELTS / Multi-Part Passage Tab Bar (Nếu đề có chia Part/Passage) */}
-        {isIELTSReadingFormat && passageGroups.length > 1 && (
-          <div className="flex items-center gap-2 mb-4 overflow-x-auto pb-1">
-            {passageGroups.map((group, pIdx) => {
-              const startQ = group.questions[0].originalIndex + 1;
-              const endQ = group.questions[group.questions.length - 1].originalIndex + 1;
-              const isActive = activePartIndex === pIdx;
+        <div className="flex items-center">
+          <CountdownTimer onTimeUp={handleSubmit} />
+        </div>
+      </header>
 
-              return (
-                <button
-                  key={pIdx}
-                  type="button"
-                  onClick={() => setActivePartIndex(pIdx)}
-                  className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all border shrink-0 ${
-                    isActive
-                      ? "bg-brand-500/20 border-brand-500 text-brand-300 ring-2 ring-brand-500/25 shadow-md"
-                      : "bg-slate-900/40 border-slate-800 text-slate-400 hover:bg-slate-850 hover:text-slate-200"
-                  }`}
-                >
-                  <BookOpen size={16} />
-                  <span>{group.title}</span>
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-slate-800/80 text-slate-400 border border-slate-700/60">
-                    Câu {startQ} - {endQ}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        )}
-
-        {/* Question Area */}
-        <div className="flex-grow mb-6">
-          {/* Chế độ 1: IELTS / Đọc hiểu chia 2 cột */}
-          {isIELTSReadingFormat && !isSingleQuestionMode ? (
-            (() => {
-              const activeGroup = passageGroups[activePartIndex] || passageGroups[0];
-              return (
-                <ReadingSplitScreen
-                  title={activeGroup.title}
-                  passageText={activeGroup.passageText}
-                >
-                  {activeGroup.questions.map(({ item, originalIndex }) => (
-                    <QuestionRenderer
-                      key={item.id}
-                      question={item}
-                      questionNumber={originalIndex + 1}
-                      selectedAnswer={answers[String(item.id)]}
-                      onChange={(ans) => handleAnswerChange(item.id, ans)}
-                      disabled={isSubmitting}
-                      isStandalonePassage={true}
-                    />
-                  ))}
-                </ReadingSplitScreen>
-              );
-            })()
-          ) : !isSingleQuestionMode ? (
-            /* Chế độ 2: Đề tiêu chuẩn (Toán, Lý, Hóa...) cuộn liền mạch từ trên xuống */
-            <div className="space-y-5">
+      {/* 2. MAIN WORKSPACE */}
+      <main className="flex-1 overflow-hidden relative">
+        {isIELTSReadingFormat && activeGroup ? (
+          // IELTS SPLIT SCREEN
+          <ReadingSplitScreen
+            title={activeGroup.title}
+            passageText={activeGroup.passageText}
+          >
+            {activeGroup.questions.map(({ item, originalIndex }) => (
+              <QuestionRenderer
+                key={item.id}
+                question={item}
+                questionNumber={originalIndex + 1}
+                selectedAnswer={answers[String(item.id)]}
+                onChange={(ans) => handleAnswerChange(item.id, ans)}
+                disabled={isSubmitting}
+                isStandalonePassage={true}
+              />
+            ))}
+          </ReadingSplitScreen>
+        ) : (
+          // STANDARD SCREEN (MATH, PHYSICS, ETC)
+          <div className="h-full w-full overflow-y-auto p-4 md:p-8">
+            <div className="max-w-3xl mx-auto space-y-6 pb-32">
               {questions.map((q, idx) => (
                 <QuestionRenderer
                   key={q.id}
@@ -285,62 +264,143 @@ export const ExamPlayer: React.FC<ExamPlayerProps> = ({ exam, questions }) => {
                 />
               ))}
             </div>
-          ) : (
-            /* Chế độ 3: Xem từng câu một (Nếu Giáo viên cấu hình) */
-            <QuestionRenderer
-              question={currentQuestion as any}
-              questionNumber={currentIndex + 1}
-              selectedAnswer={answers[qId]}
-              onChange={(ans) => handleAnswerChange(qId, ans)}
-              disabled={isSubmitting}
-            />
-          )}
+          </div>
+        )}
+
+        {/* Màn che mờ và Grid Modal (Danh sách tất cả câu hỏi) */}
+        {showGrid && (
+          <div className="absolute inset-0 z-40 bg-white/95 backdrop-blur-sm overflow-y-auto p-8 flex flex-col items-center">
+             <div className="w-full max-w-4xl">
+               <div className="flex items-center justify-between mb-8 border-b border-slate-200 pb-4">
+                 <h2 className="text-2xl font-bold text-slate-800">Tổng quan bài làm</h2>
+                 <button onClick={() => setShowGrid(false)} className="p-2 rounded-full hover"><X size={24}/></button>
+               </div>
+               
+               <div className="grid grid-cols-5 sm:grid-cols-8 md:grid-cols-10 lg:grid-cols-12 gap-3">
+                 {questions.map((q, idx) => {
+                   const isAns = answers[String(q.id)] !== undefined && answers[String(q.id)] !== null && answers[String(q.id)] !== "";
+                   const isFlag = flaggedQuestions[idx];
+                   return (
+                     <button
+                        key={q.id}
+                        onClick={() => {
+                          setShowGrid(false);
+                          scrollToQuestion(idx);
+                        }}
+                        className={`relative flex items-center justify-center h-12 w-full rounded-xl text-sm font-bold transition-all border ${
+                          isAns ? "bg-brand-50 border-brand-500/50 text-brand-700 shadow-sm" : "bg-white border-slate-200 text-slate-500 hover"
+                        }`}
+                     >
+                        {idx + 1}
+                        {isFlag && <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-orange-500 shadow-sm border-2 border-white" />}
+                     </button>
+                   )
+                 })}
+               </div>
+             </div>
+          </div>
+        )}
+      </main>
+
+      {/* 3. HORIZONTAL NAVIGATOR FOR ALL EXAMS */}
+      {!showGrid && (
+        <div className="w-full bg-slate-50 border-t border-slate-200 px-4 py-2 flex items-center justify-center gap-1.5 sm:gap-2 overflow-x-auto shadow-inner z-20">
+          {(isIELTSReadingFormat && activeGroup ? activeGroup.questions : questions.map((item, idx) => ({ item, originalIndex: idx }))).map(({ item, originalIndex }) => {
+            const qId = String(item.id);
+            const isAns = answers[qId] !== undefined && answers[qId] !== null && answers[qId] !== "";
+            const isCurrent = currentIndex === originalIndex;
+            return (
+              <button
+                key={qId}
+                onClick={() => scrollToQuestion(originalIndex)}
+                className={`flex items-center justify-center min-w-[36px] h-9 rounded-lg text-sm transition-all border flex-shrink-0 ${
+                  isCurrent && isAns
+                    ? "bg-brand-700 text-white border-brand-700 font-bold shadow-md transform scale-110 z-10"
+                    : isCurrent
+                    ? "bg-brand-500 text-white border-brand-500 font-bold shadow-md transform scale-110 z-10"
+                    : isAns
+                    ? "bg-brand-50 border-brand-200 text-brand-700 font-bold hover:bg-brand-100"
+                    : "bg-white border-slate-200 text-slate-500 font-medium hover:bg-slate-100"
+                }`}
+              >
+                {originalIndex + 1}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* 4. FOOTER (Fixed Bottom) */}
+      <footer className="flex-shrink-0 h-16 w-full bg-white border-t border-slate-200 flex items-center justify-between px-4 md:px-6 z-30 shadow-[0_-4px_10px_rgba(0,0,0,0.05)][0_-4px_10px_rgba(0,0,0,0.2)]">
+        
+        {/* Left: Grid overview toggle */}
+        <div className="flex items-center">
+          <button 
+            onClick={() => setShowGrid(!showGrid)}
+            className="flex items-center gap-2 p-2 rounded-xl text-slate-500 hover border border-transparent hover transition-all font-medium text-sm"
+          >
+            <LayoutGrid size={20} />
+            <span className="hidden sm:inline">Tổng quan</span>
+          </button>
         </div>
 
-        {/* Bottom Nav Controller */}
-        <div className="sticky bottom-4 z-20 flex items-center justify-between bg-slate-900/90 backdrop-blur-md p-3.5 md:p-4 border border-slate-800/80 rounded-2xl shadow-2xl">
-          <div className="flex items-center gap-2.5">
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={handlePrev}
-              disabled={currentIndex === 0 || isSubmitting}
-            >
-              <ChevronLeft size={18} className="mr-1" /> Câu trước
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={handleNext}
-              disabled={currentIndex === questions.length - 1 || isSubmitting}
-            >
-              Câu sau <ChevronRight size={18} className="ml-1" />
-            </Button>
+        {/* Center: Passage Tabs (Only for IELTS) */}
+        {isIELTSReadingFormat && (
+          <div className="flex items-center gap-1 sm:gap-2">
+            {passageGroups.map((group, pIdx) => {
+              const isActive = activePartIndex === pIdx;
+              const answered = calculateAnsweredCount(group.questions);
+              const total = group.questions.length;
+              return (
+                <button
+                  key={pIdx}
+                  onClick={() => setActivePartIndex(pIdx)}
+                  className={`flex flex-col sm:flex-row sm:items-center gap-0 sm:gap-2 px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl text-sm font-bold transition-all border ${
+                    isActive
+                      ? "bg-brand-50 border-brand-500/30 text-brand-700 shadow-sm"
+                      : "bg-transparent border-transparent text-slate-500 hover"
+                  }`}
+                >
+                  <span className="truncate max-w-[80px] sm:max-w-[120px]">{group.title}</span>
+                  <span className={`text-[10px] sm font-medium px-1.5 py-0.5 rounded-full ${isActive ? 'bg-brand-100' : 'bg-slate-100'} text-slate-600`}>
+                    {answered}/{total}
+                  </span>
+                </button>
+              )
+            })}
           </div>
+        )}
 
-          <div className="flex items-center gap-3">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => toggleFlag(currentIndex)}
-              className={flaggedQuestions[currentIndex] ? "text-orange-400 hover:text-orange-300" : "text-slate-400"}
-              disabled={isSubmitting}
-              title="Đánh dấu cờ (Hoặc chuột phải ở danh sách câu hỏi)"
-            >
-              <Flag size={18} className="mr-1" />
-              {flaggedQuestions[currentIndex] ? "Bỏ cờ" : "Đánh dấu cờ"}
-            </Button>
-            <Button variant="primary" size="sm" onClick={() => setIsSubmitModalOpen(true)} disabled={isSubmitting}>
-              <Send size={16} className="mr-1" /> Nộp bài
-            </Button>
-          </div>
+        {/* Right: Navigation & Submit */}
+        <div className="flex items-center gap-2 md:gap-3">
+           {isIELTSReadingFormat && activeGroup ? (
+             <div className="hidden sm:flex items-center text-sm font-semibold text-slate-500 mr-2">
+               Câu {activeGroup.questions[0].originalIndex + 1} - {activeGroup.questions[activeGroup.questions.length - 1].originalIndex + 1}
+             </div>
+           ) : null}
+           
+           <button
+             onClick={handlePrev}
+             disabled={currentIndex === 0}
+             className="w-10 h-10 flex items-center justify-center rounded-xl border border-slate-200 text-slate-600 hover disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+           >
+             <ChevronLeft size={20} />
+           </button>
+           <button
+             onClick={handleNext}
+             disabled={currentIndex === questions.length - 1}
+             className="w-10 h-10 flex items-center justify-center rounded-xl border border-slate-200 text-slate-600 hover disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+           >
+             <ChevronRight size={20} />
+           </button>
+
+           <div className="w-px h-8 bg-slate-200 mx-1 md:mx-2"></div>
+
+           <Button variant="primary" onClick={() => setIsSubmitModalOpen(true)} disabled={isSubmitting} className="font-bold shadow-md h-10 px-4 md:px-6">
+             Nộp bài
+           </Button>
         </div>
-      </div>
-
-      {/* Right pane: Navigator and Status Panel (Slim & Sticky) */}
-      <div className="w-full lg:w-60 shrink-0 sticky top-16">
-        <QuestionNavigator questions={questions} onSelectQuestion={scrollToQuestion} />
-      </div>
+      </footer>
 
       {/* Submit Confirm Dialog */}
       <SubmitConfirmModal

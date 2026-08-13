@@ -34,16 +34,16 @@ export const QuestionNavigator: React.FC<QuestionNavigatorProps> = ({ questions,
 
   if (isCollapsed) {
     return (
-      <div className="bg-slate-900/80 border border-slate-800/80 rounded-2xl p-2 shadow-2xl backdrop-blur flex flex-col items-center gap-3">
+      <div className="bg-white/80 border border-slate-200/80 rounded-2xl p-2 shadow-2xl backdrop-blur flex flex-col items-center gap-3">
         <button
           type="button"
           onClick={() => setIsCollapsed(false)}
-          className="p-2 rounded-xl bg-brand-500/20 text-brand-400 hover:bg-brand-500/30 border border-brand-500/40 transition-colors"
+          className="p-2 rounded-xl bg-brand-500/20 text-brand-400 hover border border-brand-500/40 transition-colors"
           title="Mở rộng danh sách câu hỏi"
         >
           <ChevronLeft size={18} />
         </button>
-        <span className="text-[10px] font-bold text-slate-300 writing-vertical rotate-180 tracking-wider">
+        <span className="text-[10px] font-bold text-slate-600 writing-vertical rotate-180 tracking-wider">
           CÂU HỎI ({answeredCount}/{questions.length})
         </span>
       </div>
@@ -51,10 +51,10 @@ export const QuestionNavigator: React.FC<QuestionNavigatorProps> = ({ questions,
   }
 
   return (
-    <div className="w-full bg-slate-900/70 border border-slate-800/80 rounded-2xl p-3.5 shadow-2xl backdrop-blur transition-all duration-200">
-      <div className="flex items-center justify-between pb-2.5 mb-3 border-b border-slate-800/70">
+    <div className="w-full bg-white/70 border border-slate-200/80 rounded-2xl p-3.5 shadow-2xl backdrop-blur transition-all duration-200">
+      <div className="flex items-center justify-between pb-2.5 mb-3 border-b border-slate-200/70">
         <div>
-          <h4 className="font-bold text-slate-100 text-xs uppercase tracking-wide">
+          <h4 className="font-bold text-slate-800 text-xs uppercase tracking-wide">
             Câu hỏi
           </h4>
           <span className="text-[11px] text-brand-400 font-semibold">
@@ -64,7 +64,7 @@ export const QuestionNavigator: React.FC<QuestionNavigatorProps> = ({ questions,
         <button
           type="button"
           onClick={() => setIsCollapsed(true)}
-          className="p-1 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
+          className="p-1 rounded-lg text-slate-500 hover hover transition-colors"
           title="Thu gọn thanh câu hỏi"
         >
           <ChevronRight size={16} />
@@ -86,12 +86,14 @@ export const QuestionNavigator: React.FC<QuestionNavigatorProps> = ({ questions,
               onClick={() => handleSelect(index, qId)}
               onContextMenu={(e) => handleContextMenu(e, index)}
               title={`Câu ${index + 1} - Trái: Chọn | Phải: Gắn cờ`}
-              className={`relative flex items-center justify-center h-8 w-full rounded-md text-xs font-bold transition-all duration-150 border select-none ${
-                isCurrent
-                  ? "border-brand-500 text-white bg-brand-600 shadow-md ring-2 ring-brand-500/30 font-black scale-105 z-10"
+              className={`relative flex items-center justify-center h-8 w-full rounded-md text-xs transition-all duration-150 border select-none ${
+                isCurrent && isAnswered
+                  ? "border-brand-700 text-white bg-brand-700 shadow-md ring-2 ring-brand-700/30 font-black scale-105 z-10"
+                  : isCurrent
+                  ? "border-brand-500 text-white bg-brand-500 shadow-md ring-2 ring-brand-500/30 font-black scale-105 z-10"
                   : isAnswered
-                  ? "bg-slate-800 border-slate-700/80 text-brand-300 hover:bg-slate-750"
-                  : "bg-slate-900/50 border-slate-800/80 text-slate-400 hover:bg-slate-850 hover:text-slate-200"
+                  ? "bg-brand-50 border-brand-200 text-brand-700 font-bold hover:bg-brand-100"
+                  : "bg-white/50 border-slate-200/80 text-slate-500 font-medium hover:bg-slate-100"
               }`}
             >
               {index + 1}
@@ -106,21 +108,21 @@ export const QuestionNavigator: React.FC<QuestionNavigatorProps> = ({ questions,
         })}
       </div>
 
-      <div className="mt-3 space-y-1.5 border-t border-slate-800/60 pt-2.5 text-[11px] text-slate-400">
+      <div className="mt-3 space-y-1.5 border-t border-slate-200/60 pt-2.5 text-[11px] text-slate-500">
         <div className="flex items-center gap-2">
-          <span className="w-2.5 h-2.5 rounded bg-brand-600 border border-brand-500 inline-block" />
-          <span>Đang xem</span>
+          <span className="w-2.5 h-2.5 rounded bg-brand-500 border border-brand-500 inline-block" />
+          <span>Đang chọn</span>
         </div>
         <div className="flex items-center gap-2">
-          <span className="w-2.5 h-2.5 rounded bg-slate-800 border border-slate-700 inline-block" />
+          <span className="w-2.5 h-2.5 rounded bg-brand-50 border border-brand-200 inline-block" />
           <span>Đã trả lời</span>
         </div>
         <div className="flex items-center gap-2">
-          <span className="w-2.5 h-2.5 rounded bg-slate-900 border border-slate-800 inline-block" />
-          <span>Chưa làm</span>
+          <span className="w-2.5 h-2.5 rounded bg-white border border-slate-200 inline-block" />
+          <span>Chưa trả lời</span>
         </div>
         <div className="flex items-center gap-2">
-          <span className="relative w-2.5 h-2.5 rounded bg-slate-900 border border-slate-800 inline-block">
+          <span className="relative w-2.5 h-2.5 rounded bg-white border border-slate-200 inline-block">
             <span className="absolute top-0 right-0 h-1 w-1 rounded-full bg-orange-500" />
           </span>
           <span>🚩 Chuột phải gắn cờ</span>

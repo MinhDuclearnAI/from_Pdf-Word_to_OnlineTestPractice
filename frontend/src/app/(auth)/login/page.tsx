@@ -38,14 +38,14 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-6 bg-slate-950">
-      <div className="w-full max-w-md glass-panel rounded-2xl border border-slate-800 p-8 shadow-2xl space-y-6">
+    <div className="min-h-screen flex items-center justify-center p-6 bg-slate-50">
+      <div className="w-full max-w-md glass-panel rounded-2xl border border-slate-200 p-8 shadow-2xl space-y-6">
         <div className="flex flex-col items-center text-center space-y-2">
           <div className="p-3 bg-brand-500/10 rounded-full text-brand-500 border border-brand-500/20 mb-1">
             <GraduationCap size={28} />
           </div>
-          <h2 className="text-2xl font-bold text-slate-100">Chào mừng trở lại</h2>
-          <p className="text-sm text-slate-400">Đăng nhập tài khoản AI Exam Platform của bạn</p>
+          <h2 className="text-2xl font-bold text-slate-800">Chào mừng trở lại</h2>
+          <p className="text-sm text-slate-500">Đăng nhập tài khoản AI Exam Platform của bạn</p>
         </div>
 
         {error && (
@@ -79,7 +79,7 @@ export default function LoginPage() {
           </Button>
         </form>
 
-        <div className="text-center text-sm text-slate-400">
+        <div className="text-center text-sm text-slate-500">
           Chưa có tài khoản?{" "}
           <Link href="/register" className="text-brand-400 hover:text-brand-300 font-semibold transition-colors">
             Đăng ký ngay

@@ -8,8 +8,8 @@ interface ScoreDistributionChartProps {
 export const ScoreDistributionChart: React.FC<ScoreDistributionChartProps> = ({ data }) => {
   if (!data || data.length === 0) {
     return (
-      <div className="text-center py-12 bg-slate-900/10 border border-slate-800 rounded-xl">
-        <p className="text-slate-400 text-sm">Chưa có đủ dữ liệu để hiển thị biểu đồ phổ điểm.</p>
+      <div className="text-center py-12 bg-white/10 border border-slate-200 rounded-xl">
+        <p className="text-slate-500 text-sm">Chưa có đủ dữ liệu để hiển thị biểu đồ phổ điểm.</p>
       </div>
     );
   }
@@ -18,7 +18,7 @@ export const ScoreDistributionChart: React.FC<ScoreDistributionChartProps> = ({ 
   const sortedData = [...data].sort((a, b) => a.score - b.score);
 
   return (
-    <div className="w-full h-80 bg-slate-900/40 p-4 border border-slate-800 rounded-xl">
+    <div className="w-full h-80 bg-white/40 p-4 border border-slate-200 rounded-xl">
       <h3 className="text-sm font-semibold text-slate-350 mb-4">Biểu đồ phổ điểm lớp học</h3>
       <ResponsiveContainer width="100%" height="80%">
         <BarChart data={sortedData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>

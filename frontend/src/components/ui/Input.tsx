@@ -11,15 +11,15 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
     return (
       <div className="w-full">
         {label && (
-          <label className="block text-sm font-medium text-slate-300 mb-1.5">
+          <label className="block text-sm font-medium text-slate-600 mb-1.5">
             {label}
           </label>
         )}
         <input
           type={type}
           className={clsx(
-            "w-full px-4 py-2.5 bg-slate-900/60 border rounded-lg text-slate-100 placeholder-slate-500 transition-all duration-200 focus:outline-none focus:ring-2 focus:border-brand-500 focus:ring-brand-500/20",
-            error ? "border-red-500 focus:border-red-500 focus:ring-red-500/20" : "border-slate-700",
+            "w-full px-4 py-2.5 bg-white/60 border rounded-lg text-slate-800 placeholder-slate-500 transition-all duration-200 focus:outline-none focus:ring-2 focus:border-brand-500 focus:ring-brand-500/20",
+            error ? "border-red-500 focus:border-red-500 focus:ring-red-500/20" : "border-slate-300",
             className
           )}
           ref={ref}

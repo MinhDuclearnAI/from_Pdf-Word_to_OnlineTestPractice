@@ -37,11 +37,11 @@ export default function PracticeUploadPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between">
+    <div className="min-h-screen bg-slate-50 text-slate-800 flex flex-col justify-between">
       {/* Header */}
-      <header className="border-b border-slate-900 bg-slate-900/20 backdrop-blur-md">
+      <header className="border-b border-slate-200 bg-white/20 backdrop-blur-md">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <Link href="/dashboard" className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-200 transition-colors">
+          <Link href="/dashboard" className="flex items-center gap-1.5 text-xs text-slate-500 hover transition-colors">
             <ChevronLeft size={16} /> Quay lại Dashboard
           </Link>
           <div className="flex items-center gap-2">
@@ -57,8 +57,8 @@ export default function PracticeUploadPage() {
           <div className="p-3.5 bg-brand-500/15 rounded-2xl text-brand-400 border border-brand-500/30 w-fit mx-auto mb-2 shadow-lg">
             <Brain size={32} />
           </div>
-          <h2 className="text-2xl font-black text-slate-100">Upload Đề Tự Luyện Tập</h2>
-          <p className="text-sm text-slate-400 max-w-md mx-auto leading-relaxed">
+          <h2 className="text-2xl font-black text-slate-800">Upload Đề Tự Luyện Tập</h2>
+          <p className="text-sm text-slate-500 max-w-md mx-auto leading-relaxed">
             Hệ thống AI sẽ tự động bóc tách đề thi (PDF/Word) và thiết lập bài luyện tập trực tuyến 1 trang liền mạch cho bạn.
           </p>
         </div>
@@ -86,7 +86,7 @@ export default function PracticeUploadPage() {
         )}
       </main>
 
-      <footer className="max-w-7xl mx-auto w-full px-6 py-8 border-t border-slate-900 text-center text-xs text-slate-500">
+      <footer className="max-w-7xl mx-auto w-full px-6 py-8 border-t border-slate-200 text-center text-xs text-slate-500">
         AI bóc tách đề thi hỗ trợ file PDF gốc, PDF scan, Word (DOCX/DOC).
       </footer>
     </div>

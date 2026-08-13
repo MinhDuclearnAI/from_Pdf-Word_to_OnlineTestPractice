@@ -3,43 +3,10 @@
 @tailwind utilities;
 
 :root {
-  --background: #0f0508;
-  --foreground: #fff1f2;
-  
-  --slate-50: #fff1f2;
-  --slate-100: #ffe4e6;
-  --slate-200: #fecdd3;
-  --slate-300: #fda4af;
-  --slate-400: #d4a5b0;
-  --slate-500: #9f737f;
-  --slate-600: #6b4650;
-  --slate-700: #45202a;
-  --slate-800: #2d121a;
-  --slate-900: #1c0a10;
-  --slate-950: #0f0508;
-
-  --glass-bg: rgba(28, 10, 16, 0.85);
-  --glass-border: rgba(225, 29, 72, 0.18);
-}
-
-.light-mode {
-  --background: #fffbfb;
-  --foreground: #1c0a10;
-
-  --slate-50: #1c0a10;
-  --slate-100: #2d121a;
-  --slate-200: #45202a;
-  --slate-300: #6b4650;
-  --slate-400: #8a5d68;
-  --slate-500: #ab808c;
-  --slate-600: #d4a5b0;
-  --slate-700: #f3d5dc;
-  --slate-800: #fce8ec;
-  --slate-900: #ffffff;
-  --slate-950: #fffbfb;
-
-  --glass-bg: rgba(255, 255, 255, 0.92);
-  --glass-border: rgba(225, 29, 72, 0.15);
+  --background: #f8fafc;
+  --foreground: #0f172a;
+  --glass-bg: rgba(255, 255, 255, 0.95);
+  --glass-border: rgba(225, 29, 72, 0.1);
 }
 
 body {
@@ -49,19 +16,19 @@ body {
   overflow-x: hidden;
 }
 
-/* Chuẩn hóa Input / Textarea để đồng bộ Dark/Light mode không bao giờ bị lệch màu */
+/* Chuẩn hóa Input / Textarea để đồng bộ */
 input, textarea, select {
-  color: var(--foreground);
+  color: #0f172a;
 }
 
-.light-mode textarea, .light-mode input[type="text"], .light-mode input[type="number"], .light-mode select {
+textarea, input[type="text"], input[type="number"], select {
   background-color: #ffffff !important;
-  color: #1c0a10 !important;
-  border-color: #f3d5dc !important;
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
 }
 
-.light-mode textarea::placeholder, .light-mode input::placeholder {
-  color: #8a5d68 !important;
+textarea::placeholder, input::placeholder {
+  color: #64748b !important;
 }
 
 /* Glassmorphism utility classes */
@@ -73,34 +40,36 @@ input, textarea, select {
 }
 
 .glass-card {
-  background: var(--slate-900);
+  background: #ffffff;
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border: 1px solid var(--glass-border);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+  border-radius: 12px;
 }
 
 .glass-card:hover {
-  border-color: rgba(225, 29, 72, 0.45);
-  box-shadow: 0 12px 36px -12px rgba(225, 29, 72, 0.25);
+  border-color: rgba(225, 29, 72, 0.3);
+  box-shadow: 0 12px 36px -12px rgba(225, 29, 72, 0.15);
   transform: translateY(-2px);
 }
 
-/* Custom Scrollbar tông Đỏ Đô */
+/* Custom Scrollbar tông Đỏ/Trắng */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: rgba(45, 18, 26, 0.3);
+  background: #f1f5f9;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(225, 29, 72, 0.35);
+  background: rgba(225, 29, 72, 0.6);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(225, 29, 72, 0.6);
+  background: rgba(225, 29, 72, 0.9);
 }

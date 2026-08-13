@@ -95,15 +95,15 @@ export const QuestionReviewList: React.FC<QuestionReviewListProps> = ({ examId, 
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between border-b border-slate-800 pb-4">
-        <h3 className="text-lg font-bold text-slate-100">Danh sách câu hỏi bóc tách</h3>
+      <div className="flex items-center justify-between border-b border-slate-200 pb-4">
+        <h3 className="text-lg font-bold text-slate-800">Danh sách câu hỏi bóc tách</h3>
         <Button variant="secondary" size="sm" onClick={handleAddQuestion} className="flex items-center gap-1">
           <Plus size={16} /> Thêm câu hỏi
         </Button>
       </div>
 
       {questions.length === 0 ? (
-        <div className="text-center py-8 text-slate-400 text-sm">
+        <div className="text-center py-8 text-slate-500 text-sm">
           Chưa có câu hỏi nào. Nhấp vào "Thêm câu hỏi" để tạo.
         </div>
       ) : (
@@ -112,13 +112,13 @@ export const QuestionReviewList: React.FC<QuestionReviewListProps> = ({ examId, 
             const isEditing = editingId === q.id;
 
             return (
-              <div key={q.id} className="glass-card rounded-xl p-5 border border-slate-800 space-y-4">
+              <div key={q.id} className="glass-card rounded-xl p-5 border border-slate-200 space-y-4">
                 <div className="flex items-start justify-between">
                   <span className="font-bold text-brand-400 text-sm">Câu {idx + 1}</span>
                   <div className="flex items-center gap-2">
                     {isEditing ? (
                       <>
-                        <Button variant="ghost" size="sm" onClick={handleEditCancel} className="text-slate-400">
+                        <Button variant="ghost" size="sm" onClick={handleEditCancel} className="text-slate-500">
                           Hủy
                         </Button>
                         <Button
@@ -135,14 +135,14 @@ export const QuestionReviewList: React.FC<QuestionReviewListProps> = ({ examId, 
                         <button
                           type="button"
                           onClick={() => handleEditStart(q)}
-                          className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded"
+                          className="p-1.5 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded"
                         >
                           <Edit2 size={16} />
                         </button>
                         <button
                           type="button"
                           onClick={() => handleDelete(q.id)}
-                          className="p-1.5 text-slate-400 hover:text-red-400 hover:bg-slate-800 rounded"
+                          className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-slate-100 rounded"
                         >
                           <Trash2 size={16} />
                         </button>
@@ -161,11 +161,11 @@ export const QuestionReviewList: React.FC<QuestionReviewListProps> = ({ examId, 
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-sm font-medium text-slate-300 mb-1.5">Loại Component</label>
+                        <label className="block text-sm font-medium text-slate-600 mb-1.5">Loại Component</label>
                         <select
                           value={editingData.component_type || ""}
                           onChange={(e) => handleFieldChange("component_type", e.target.value)}
-                          className="w-full px-4 py-2 bg-slate-900 border border-slate-800 rounded-lg text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                          className="w-full px-4 py-2 bg-white border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
                         >
                           <option value="multiple_choice">Trắc nghiệm</option>
                           <option value="math_equation">Công thức Toán (LaTeX)</option>
@@ -191,10 +191,10 @@ export const QuestionReviewList: React.FC<QuestionReviewListProps> = ({ examId, 
 
                     {editingData.component_type === "multiple_choice" && (
                       <div className="space-y-2">
-                        <label className="block text-sm font-medium text-slate-300">Các tùy chọn đáp án</label>
+                        <label className="block text-sm font-medium text-slate-600">Các tùy chọn đáp án</label>
                         {(editingData.options || []).map((opt, oIdx) => (
                           <div key={oIdx} className="flex items-center gap-2">
-                            <span className="font-semibold text-xs text-slate-400">{String.fromCharCode(65 + oIdx)}</span>
+                            <span className="font-semibold text-xs text-slate-500">{String.fromCharCode(65 + oIdx)}</span>
                             <Input value={opt} onChange={(e) => handleOptionChange(oIdx, e.target.value)} />
                           </div>
                         ))}
@@ -209,14 +209,14 @@ export const QuestionReviewList: React.FC<QuestionReviewListProps> = ({ examId, 
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    <p className="text-slate-200 font-medium whitespace-pre-wrap leading-relaxed">
+                    <p className="text-slate-700 font-medium whitespace-pre-wrap leading-relaxed">
                       {q.question_text}
                     </p>
                     
                     {q.component_type === "multiple_choice" && q.options && q.options.length > 0 && (
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2">
                         {q.options.map((opt, oIdx) => (
-                          <div key={oIdx} className="text-sm text-slate-400 flex gap-2">
+                          <div key={oIdx} className="text-sm text-slate-500 flex gap-2">
                             <span className="font-bold text-brand-400">{String.fromCharCode(65 + oIdx)}.</span>
                             <span>{opt}</span>
                           </div>
@@ -225,9 +225,9 @@ export const QuestionReviewList: React.FC<QuestionReviewListProps> = ({ examId, 
                     )}
 
                     {q.correct_answer && (
-                      <div className="text-sm text-slate-400 mt-2">
+                      <div className="text-sm text-slate-500 mt-2">
                         Đáp án đúng: <span className="text-green-500 font-semibold">{q.correct_answer}</span> | 
-                        Trọng số: <span className="text-slate-200 font-semibold">{q.score_weight} điểm</span>
+                        Trọng số: <span className="text-slate-700 font-semibold">{q.score_weight} điểm</span>
                       </div>
                     )}
                   </div>

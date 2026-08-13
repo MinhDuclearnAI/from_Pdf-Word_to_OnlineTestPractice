@@ -46,14 +46,14 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-6 bg-slate-950">
-      <div className="w-full max-w-md glass-panel rounded-2xl border border-slate-800 p-8 shadow-2xl space-y-6">
+    <div className="min-h-screen flex items-center justify-center p-6 bg-slate-50">
+      <div className="w-full max-w-md glass-panel rounded-2xl border border-slate-200 p-8 shadow-2xl space-y-6">
         <div className="flex flex-col items-center text-center space-y-2">
           <div className="p-3 bg-brand-500/10 rounded-full text-brand-500 border border-brand-500/20 mb-1">
             <GraduationCap size={28} />
           </div>
-          <h2 className="text-2xl font-bold text-slate-100">Tạo tài khoản mới</h2>
-          <p className="text-sm text-slate-400">Đăng ký hệ thống thi trực tuyến bằng AI</p>
+          <h2 className="text-2xl font-bold text-slate-800">Tạo tài khoản mới</h2>
+          <p className="text-sm text-slate-500">Đăng ký hệ thống thi trực tuyến bằng AI</p>
         </div>
 
         {error && (
@@ -101,15 +101,15 @@ export default function RegisterPage() {
           />
 
           <div className="w-full">
-            <label className="block text-sm font-medium text-slate-300 mb-1.5">Vai trò thành viên</label>
+            <label className="block text-sm font-medium text-slate-600 mb-1.5">Vai trò thành viên</label>
             <div className="grid grid-cols-2 gap-4">
               <button
                 type="button"
                 onClick={() => setRole("student")}
                 className={`py-2.5 rounded-lg border text-sm font-semibold transition-all duration-200 ${
                   role === "student"
-                    ? "bg-brand-500/10 border-brand-500 text-slate-100 ring-1 ring-brand-500"
-                    : "bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700"
+                    ? "bg-brand-500/10 border-brand-500 text-slate-800 ring-1 ring-brand-500"
+                    : "bg-white border-slate-200 text-slate-500 hover:border-slate-300"
                 }`}
                 disabled={loading || success}
               >
@@ -120,8 +120,8 @@ export default function RegisterPage() {
                 onClick={() => setRole("teacher")}
                 className={`py-2.5 rounded-lg border text-sm font-semibold transition-all duration-200 ${
                   role === "teacher"
-                    ? "bg-brand-500/10 border-brand-500 text-slate-100 ring-1 ring-brand-500"
-                    : "bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700"
+                    ? "bg-brand-500/10 border-brand-500 text-slate-800 ring-1 ring-brand-500"
+                    : "bg-white border-slate-200 text-slate-500 hover:border-slate-300"
                 }`}
                 disabled={loading || success}
               >
@@ -169,7 +169,7 @@ export default function RegisterPage() {
           </Button>
         </form>
 
-        <div className="text-center text-sm text-slate-400">
+        <div className="text-center text-sm text-slate-500">
           Đã có tài khoản?{" "}
           <Link href="/login" className="text-brand-400 hover:text-brand-300 font-semibold transition-colors">
             Đăng nhập

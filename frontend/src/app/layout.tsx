@@ -13,7 +13,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/katex.min.css" />
       </head>
-      <body className="bg-slate-950 text-slate-100 min-h-screen flex flex-col transition-colors duration-300">
+      <body className="bg-slate-50 text-slate-800 min-h-screen flex flex-col transition-colors duration-300">
         {children}
         <ThemeToggle />
       </body>

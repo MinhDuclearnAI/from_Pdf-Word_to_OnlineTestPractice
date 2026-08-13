@@ -31,8 +31,8 @@ export const SubmitConfirmModal: React.FC<SubmitConfirmModalProps> = ({
             <div className="p-3 bg-yellow-500/10 rounded-full text-yellow-500 mb-3 border border-yellow-500/20">
               <AlertTriangle size={32} />
             </div>
-            <h4 className="font-semibold text-slate-100 text-lg">Bạn vẫn muốn nộp bài?</h4>
-            <p className="text-sm text-slate-400 mt-1 max-w-sm">
+            <h4 className="font-semibold text-slate-800 text-lg">Bạn vẫn muốn nộp bài?</h4>
+            <p className="text-sm text-slate-500 mt-1 max-w-sm">
               Bạn vẫn còn <span className="text-yellow-500 font-semibold">{unansweredCount} câu hỏi</span> chưa hoàn thành câu trả lời.
             </p>
           </div>
@@ -41,8 +41,8 @@ export const SubmitConfirmModal: React.FC<SubmitConfirmModalProps> = ({
             <div className="p-3 bg-green-500/10 rounded-full text-green-500 mb-3 border border-green-500/20">
               <CheckCircle size={32} />
             </div>
-            <h4 className="font-semibold text-slate-100 text-lg">Hoàn thành bài thi</h4>
-            <p className="text-sm text-slate-400 mt-1 max-w-sm">
+            <h4 className="font-semibold text-slate-800 text-lg">Hoàn thành bài thi</h4>
+            <p className="text-sm text-slate-500 mt-1 max-w-sm">
               Tuyệt vời! Bạn đã hoàn thành toàn bộ <span className="text-green-500 font-semibold">{totalQuestions} câu hỏi</span>.
             </p>
           </div>

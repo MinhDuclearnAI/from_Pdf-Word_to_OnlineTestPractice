@@ -37,8 +37,8 @@ export const ExamConfigForm: React.FC<ExamConfigFormProps> = ({ initialConfig, o
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-5 bg-slate-900/60 p-6 border border-slate-800 rounded-2xl shadow-xl">
-      <h3 className="text-base font-bold text-slate-100 mb-2">Cấu hình bài kiểm tra</h3>
+    <form onSubmit={handleSubmit} className="space-y-5 bg-white/60 p-6 border border-slate-200 rounded-2xl shadow-xl">
+      <h3 className="text-base font-bold text-slate-800 mb-2">Cấu hình bài kiểm tra</h3>
       
       <Input
         label="Thời gian làm bài (phút)"
@@ -66,13 +66,13 @@ export const ExamConfigForm: React.FC<ExamConfigFormProps> = ({ initialConfig, o
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="w-full">
-          <label className="block text-sm font-medium text-slate-300 mb-1.5">
+          <label className="block text-sm font-medium text-slate-600 mb-1.5">
             Quyền xem kết quả của học sinh
           </label>
           <select
             value={resultVisibility}
             onChange={(e) => setResultVisibility(e.target.value)}
-            className="w-full px-4 py-2.5 bg-slate-900 border border-slate-800 rounded-lg text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+            className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
           >
             <option value="detailed">Xem điểm & xem chi tiết đáp án ngay</option>
             <option value="score_only">Chỉ xem điểm, ẩn đáp án</option>
@@ -81,13 +81,13 @@ export const ExamConfigForm: React.FC<ExamConfigFormProps> = ({ initialConfig, o
         </div>
 
         <div className="w-full">
-          <label className="block text-sm font-medium text-slate-300 mb-1.5">
+          <label className="block text-sm font-medium text-slate-600 mb-1.5">
             Chế độ hiển thị khi làm bài
           </label>
           <select
             value={displayMode}
             onChange={(e) => setDisplayMode(e.target.value)}
-            className="w-full px-4 py-2.5 bg-slate-900 border border-slate-800 rounded-lg text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+            className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
           >
             <option value="continuous">Cuộn toàn bộ trên 1 trang (Mặc định)</option>
             <option value="single">Chia từng trang từng câu</option>

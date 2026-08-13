@@ -52,15 +52,15 @@ export default function ExamStatsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
-        <span className="text-slate-400">Đang tải báo cáo thống kê...</span>
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <span className="text-slate-500">Đang tải báo cáo thống kê...</span>
       </div>
     );
   }
 
   if (!exam || !stats) {
     return (
-      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 text-center">
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 text-center">
         <p className="text-red-400 mb-4 font-semibold">Không tìm thấy dữ liệu thống kê.</p>
         <Link href="/dashboard" className="text-brand-400 hover:underline">Quay lại Dashboard</Link>
       </div>
@@ -68,11 +68,11 @@ export default function ExamStatsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between">
+    <div className="min-h-screen bg-slate-50 text-slate-800 flex flex-col justify-between">
       {/* Header */}
-      <header className="border-b border-slate-900 bg-slate-900/20 backdrop-blur-md">
+      <header className="border-b border-slate-200 bg-white/20 backdrop-blur-md">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center">
-          <Link href={`/exams/${examId}/edit`} className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-200 transition-colors">
+          <Link href={`/exams/${examId}/edit`} className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-700 transition-colors">
             <ChevronLeft size={16} /> Quay lại biên tập đề
           </Link>
         </div>
@@ -81,25 +81,25 @@ export default function ExamStatsPage() {
       {/* Main Content */}
       <main className="flex-grow max-w-7xl mx-auto w-full px-6 py-8 space-y-8">
         <div>
-          <h1 className="text-2xl font-black text-slate-100 mb-1">Thống Kê Báo Cáo Kết Quả</h1>
-          <p className="text-xs text-slate-400 uppercase font-semibold">
+          <h1 className="text-2xl font-black text-slate-800 mb-1">Thống Kê Báo Cáo Kết Quả</h1>
+          <p className="text-xs text-slate-500 uppercase font-semibold">
             Đề kiểm tra: {exam.title} | Lớp học: {exam.class_name || `Mã #${exam.class_id}`}
           </p>
         </div>
 
         {/* Stats Summary Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-          <div className="glass-card rounded-xl p-5 border border-slate-800 flex items-start gap-4">
+          <div className="glass-card rounded-xl p-5 border border-slate-200 flex items-start gap-4">
             <div className="p-3 bg-brand-500/10 rounded-lg text-brand-400 shrink-0">
               <Users size={20} />
             </div>
             <div>
               <span className="block text-xs font-bold text-slate-500 uppercase tracking-wider">Lượt nộp bài</span>
-              <span className="block text-2xl font-black text-slate-200 mt-1">{stats.total_submissions}</span>
+              <span className="block text-2xl font-black text-slate-700 mt-1">{stats.total_submissions}</span>
             </div>
           </div>
 
-          <div className="glass-card rounded-xl p-5 border border-slate-800 flex items-start gap-4">
+          <div className="glass-card rounded-xl p-5 border border-slate-200 flex items-start gap-4">
             <div className="p-3 bg-brand-500/10 rounded-lg text-brand-400 shrink-0">
               <Award size={20} />
             </div>
@@ -109,7 +109,7 @@ export default function ExamStatsPage() {
             </div>
           </div>
 
-          <div className="glass-card rounded-xl p-5 border border-slate-800 flex items-start gap-4">
+          <div className="glass-card rounded-xl p-5 border border-slate-200 flex items-start gap-4">
             <div className="p-3 bg-green-500/10 rounded-lg text-green-500 shrink-0">
               <TrendingUp size={20} />
             </div>
@@ -119,7 +119,7 @@ export default function ExamStatsPage() {
             </div>
           </div>
 
-          <div className="glass-card rounded-xl p-5 border border-slate-800 flex items-start gap-4">
+          <div className="glass-card rounded-xl p-5 border border-slate-200 flex items-start gap-4">
             <div className="p-3 bg-red-500/10 rounded-lg text-red-500 shrink-0">
               <ShieldAlert size={20} />
             </div>
@@ -137,8 +137,8 @@ export default function ExamStatsPage() {
           </div>
 
           {/* Right Column: submissions log */}
-          <div className="glass-panel rounded-xl border border-slate-800 p-5 space-y-4">
-            <h3 className="font-bold text-slate-200 text-sm flex items-center gap-2 border-b border-slate-800/80 pb-3">
+          <div className="glass-panel rounded-xl border border-slate-200 p-5 space-y-4">
+            <h3 className="font-bold text-slate-700 text-sm flex items-center gap-2 border-b border-slate-200/80 pb-3">
               <BarChart3 size={16} className="text-brand-400" /> Nhật ký bài nộp
             </h3>
             
@@ -149,7 +149,7 @@ export default function ExamStatsPage() {
                 {submissions.map((sub) => (
                   <div key={sub.id} className="py-2.5 flex items-center justify-between">
                     <div>
-                      <span className="block font-medium text-slate-200 truncate max-w-[150px]" title={sub.student_email}>
+                      <span className="block font-medium text-slate-700 truncate max-w-[150px]" title={sub.student_email}>
                         {sub.student_email}
                       </span>
                       <span className="block text-xs text-slate-500 mt-0.5">
@@ -172,7 +172,7 @@ export default function ExamStatsPage() {
         </div>
       </main>
 
-      <footer className="max-w-7xl mx-auto w-full px-6 py-8 border-t border-slate-900 text-center text-xs text-slate-500">
+      <footer className="max-w-7xl mx-auto w-full px-6 py-8 border-t border-slate-200 text-center text-xs text-slate-500">
         AI Exam Platform • Thống kê phân tích kết quả bài kiểm tra.
       </footer>
     </div>

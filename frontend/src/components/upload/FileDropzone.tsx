@@ -64,7 +64,7 @@ export const FileDropzone: React.FC<FileDropzoneProps> = ({ onFileSelect, disabl
         className={`relative flex flex-col items-center justify-center w-full h-64 border-2 border-dashed rounded-xl cursor-pointer transition-all duration-300 ${
           isDragActive
             ? "border-brand-500 bg-brand-500/10"
-            : "border-slate-700 bg-slate-900/40 hover:bg-slate-900/60 hover:border-slate-600"
+            : "border-slate-300 bg-white/40 hover:bg-white/60 hover:border-slate-600"
         } ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
       >
         <input
@@ -77,13 +77,13 @@ export const FileDropzone: React.FC<FileDropzoneProps> = ({ onFileSelect, disabl
         />
 
         <div className="flex flex-col items-center justify-center pt-5 pb-6 text-center px-4">
-          <div className="p-4 bg-slate-800/80 rounded-full mb-4 text-brand-400 transition-transform">
+          <div className="p-4 bg-slate-100/80 rounded-full mb-4 text-brand-400 transition-transform">
             <Upload size={28} />
           </div>
-          <p className="mb-2 text-sm text-slate-200 font-medium">
+          <p className="mb-2 text-sm text-slate-700 font-medium">
             <span className="text-brand-400 font-semibold">Nhấn để tải lên</span> hoặc kéo thả tệp tin
           </p>
-          <p className="text-xs text-slate-400">PDF, Word (DOCX, DOC) tối đa 10MB</p>
+          <p className="text-xs text-slate-500">PDF, Word (DOCX, DOC) tối đa 10MB</p>
         </div>
       </div>
 

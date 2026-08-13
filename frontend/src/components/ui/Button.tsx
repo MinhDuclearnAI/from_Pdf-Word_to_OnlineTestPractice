@@ -19,9 +19,9 @@ export const Button: React.FC<ButtonProps> = ({
         "inline-flex items-center justify-center font-medium rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed",
         {
           "bg-brand-500 hover:bg-brand-600 text-white focus:ring-brand-500 shadow-lg shadow-brand-500/20": variant === "primary",
-          "bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 focus:ring-slate-500": variant === "secondary",
+          "bg-slate-100 hover:bg-slate-700 text-slate-700 border border-slate-300 focus:ring-slate-500": variant === "secondary",
           "bg-red-600 hover:bg-red-700 text-white focus:ring-red-500 shadow-lg shadow-red-500/20": variant === "danger",
-          "hover:bg-slate-800 text-slate-300 focus:ring-slate-500": variant === "ghost",
+          "hover:bg-slate-100 text-slate-600 focus:ring-slate-500": variant === "ghost",
         },
         {
           "px-3 py-1.5 text-sm": size === "sm",

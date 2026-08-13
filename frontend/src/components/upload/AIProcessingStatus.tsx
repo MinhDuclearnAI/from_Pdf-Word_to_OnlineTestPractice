@@ -43,7 +43,7 @@ export const AIProcessingStatus: React.FC<AIProcessingStatusProps> = ({ jobId, o
   }, [jobId, onComplete, onFailed]);
 
   return (
-    <div className="w-full p-6 glass-panel rounded-xl border border-slate-700/50">
+    <div className="w-full p-6 glass-panel rounded-xl border border-slate-300/50">
       <div className="flex items-center gap-4 mb-4">
         {status === "failed" ? (
           <XCircle className="text-red-500 shrink-0" size={32} />
@@ -54,20 +54,20 @@ export const AIProcessingStatus: React.FC<AIProcessingStatusProps> = ({ jobId, o
         )}
 
         <div className="flex-1">
-          <h4 className="font-semibold text-slate-100 text-base">
+          <h4 className="font-semibold text-slate-800 text-base">
             {status === "failed"
               ? "Xử lý tệp thất bại"
               : status === "done"
               ? "Bóc tách đề thi thành công!"
               : "Hệ thống AI đang bóc tách..."}
           </h4>
-          <p className="text-sm text-slate-400 mt-0.5">{message}</p>
+          <p className="text-sm text-slate-500 mt-0.5">{message}</p>
         </div>
 
         <span className="font-bold text-lg text-brand-400">{progress}%</span>
       </div>
 
-      <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
+      <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
         <div
           className={`h-full transition-all duration-500 ${
             status === "failed" ? "bg-red-500" : status === "done" ? "bg-green-500" : "bg-brand-500"

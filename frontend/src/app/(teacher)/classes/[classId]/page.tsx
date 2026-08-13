@@ -91,15 +91,15 @@ export default function ClassDetailsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
-        <span className="text-slate-400">Đang tải thông tin lớp học...</span>
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <span className="text-slate-500">Đang tải thông tin lớp học...</span>
       </div>
     );
   }
 
   if (!classInfo) {
     return (
-      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 text-center">
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 text-center">
         <p className="text-red-400 mb-4 font-semibold">Không tìm thấy lớp học này.</p>
         <Link href="/dashboard" className="text-brand-400 hover:underline">Quay lại Dashboard</Link>
       </div>
@@ -107,11 +107,11 @@ export default function ClassDetailsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between">
+    <div className="min-h-screen bg-slate-50 text-slate-800 flex flex-col justify-between">
       {/* Header */}
-      <header className="border-b border-slate-900 bg-slate-900/20 backdrop-blur-md">
+      <header className="border-b border-slate-200 bg-white/20 backdrop-blur-md">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <Link href="/dashboard" className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-200 transition-colors">
+          <Link href="/dashboard" className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-700 transition-colors">
             <ChevronLeft size={16} /> Quay lại Dashboard
           </Link>
           <div className="flex gap-2">
@@ -130,18 +130,18 @@ export default function ClassDetailsPage() {
       {/* Main Content */}
       <main className="flex-grow max-w-7xl mx-auto w-full px-6 py-8 space-y-6">
         <div>
-          <h1 className="text-2xl font-black text-slate-100 mb-1">{classInfo.name}</h1>
-          <p className="text-xs text-slate-400 uppercase font-semibold">Môn học: {classInfo.subject}</p>
+          <h1 className="text-2xl font-black text-slate-800 mb-1">{classInfo.name}</h1>
+          <p className="text-xs text-slate-500 uppercase font-semibold">Môn học: {classInfo.subject}</p>
         </div>
 
         {/* Tab Buttons */}
-        <div className="flex border-b border-slate-900 gap-6">
+        <div className="flex border-b border-slate-200 gap-6">
           <button
             onClick={() => setActiveTab("exams")}
             className={`py-3 text-sm font-semibold border-b-2 transition-colors ${
               activeTab === "exams"
                 ? "border-brand-500 text-brand-400"
-                : "border-transparent text-slate-400 hover:text-slate-200"
+                : "border-transparent text-slate-500 hover:text-slate-700"
             }`}
           >
             Đề kiểm tra ({exams.length})
@@ -151,7 +151,7 @@ export default function ClassDetailsPage() {
             className={`py-3 text-sm font-semibold border-b-2 transition-colors ${
               activeTab === "students"
                 ? "border-brand-500 text-brand-400"
-                : "border-transparent text-slate-400 hover:text-slate-200"
+                : "border-transparent text-slate-500 hover:text-slate-700"
             }`}
           >
             Học sinh ({students.length})
@@ -161,7 +161,7 @@ export default function ClassDetailsPage() {
             className={`py-3 text-sm font-semibold border-b-2 transition-colors ${
               activeTab === "leaderboard"
                 ? "border-brand-500 text-brand-400"
-                : "border-transparent text-slate-400 hover:text-slate-200"
+                : "border-transparent text-slate-500 hover:text-slate-700"
             }`}
           >
             Bảng xếp hạng
@@ -173,7 +173,7 @@ export default function ClassDetailsPage() {
           {activeTab === "exams" && (
             <div className="space-y-4">
               {exams.length === 0 ? (
-                <div className="text-center py-12 bg-slate-900/10 border border-slate-800 rounded-xl">
+                <div className="text-center py-12 bg-white/10 border border-slate-200 rounded-xl">
                   <p className="text-slate-500 text-sm">Chưa có bài thi nào được giao trong lớp này.</p>
                 </div>
               ) : (
@@ -187,17 +187,17 @@ export default function ClassDetailsPage() {
           )}
 
           {activeTab === "students" && (
-            <div className="glass-panel rounded-xl border border-slate-800 p-6">
-              <h3 className="font-bold text-slate-200 mb-4 flex items-center gap-2">
+            <div className="glass-panel rounded-xl border border-slate-200 p-6">
+              <h3 className="font-bold text-slate-700 mb-4 flex items-center gap-2">
                 <Users size={18} className="text-brand-400" /> Danh sách học sinh lớp học
               </h3>
               {students.length === 0 ? (
-                <p className="text-slate-400 text-sm">Chưa có học sinh nào được thêm vào lớp học này.</p>
+                <p className="text-slate-500 text-sm">Chưa có học sinh nào được thêm vào lớp học này.</p>
               ) : (
                 <div className="divide-y divide-slate-800/50">
                   {students.map((st) => (
                     <div key={st.id} className="py-3 flex items-center justify-between text-sm">
-                      <span className="font-medium text-slate-200">{st.email}</span>
+                      <span className="font-medium text-slate-700">{st.email}</span>
                       <span className="text-xs text-slate-500">ID: #{st.id}</span>
                     </div>
                   ))}
@@ -207,8 +207,8 @@ export default function ClassDetailsPage() {
           )}
 
           {activeTab === "leaderboard" && (
-            <div className="glass-panel rounded-xl border border-slate-800 p-6">
-              <h3 className="font-bold text-slate-200 mb-4 flex items-center gap-2">
+            <div className="glass-panel rounded-xl border border-slate-200 p-6">
+              <h3 className="font-bold text-slate-700 mb-4 flex items-center gap-2">
                 <Trophy size={18} className="text-brand-400" /> Bảng điểm tổng hợp học tập
               </h3>
               <LeaderboardTable entries={leaderboard} />

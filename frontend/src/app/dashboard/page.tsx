@@ -162,9 +162,9 @@ export default function DashboardPage() {
   // Show loading screen while auth state is being determined
   if (authLoading) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center gap-3">
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center gap-3">
         <div className="w-6 h-6 rounded-full border-2 border-brand-500 border-t-transparent animate-spin" />
-        <span className="text-slate-400 text-sm">Đang tải hệ thống...</span>
+        <span className="text-slate-500 text-sm">Đang tải hệ thống...</span>
       </div>
     );
   }
@@ -173,8 +173,8 @@ export default function DashboardPage() {
   // but this is a safety net to prevent a blank screen)
   if (!user) {
     return (
-      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center gap-4">
-        <span className="text-slate-400 text-sm">Phiên đăng nhập đã hết hạn.</span>
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center gap-4">
+        <span className="text-slate-500 text-sm">Phiên đăng nhập đã hết hạn.</span>
         <a href="/login" className="px-4 py-2 bg-brand-500 hover:bg-brand-600 text-white text-sm font-semibold rounded-lg transition-colors">
           Đăng nhập lại
         </a>
@@ -183,9 +183,9 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col">
+    <div className="min-h-screen bg-slate-50 text-slate-800 flex flex-col">
       {/* Header */}
-      <header className="border-b border-slate-900 bg-slate-900/20 backdrop-blur-md sticky top-0 z-30">
+      <header className="border-b border-slate-200 bg-white/20 backdrop-blur-md sticky top-0 z-30">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <GraduationCap className="text-brand-500" size={32} />
@@ -196,19 +196,19 @@ export default function DashboardPage() {
             <div className="relative" ref={profileMenuRef}>
               <button
                 onClick={() => setShowProfileMenu(!showProfileMenu)}
-                className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-lg text-xs text-slate-400 cursor-pointer transition-colors"
+                className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-white hover:bg-slate-100 border border-slate-200 rounded-lg text-xs text-slate-500 cursor-pointer transition-colors"
               >
-                <UserIcon size={14} className="text-slate-400" />
+                <UserIcon size={14} className="text-slate-500" />
                 <span>{user.email}</span>
                 <span className="h-1.5 w-1.5 rounded-full bg-slate-700 mx-1"></span>
                 <span className="uppercase text-brand-400 font-bold">{user.role === "teacher" ? "Giáo viên" : "Học sinh"}</span>
               </button>
               
               {showProfileMenu && (
-                <div className="absolute right-0 top-full mt-2 w-72 bg-slate-900 border border-slate-800 rounded-xl shadow-2xl z-50 overflow-hidden transform origin-top-right transition-all">
-                  <div className="p-4 border-b border-slate-800 bg-slate-800/30">
-                    <h4 className="font-bold text-slate-100 text-lg mb-0.5">{user.full_name || "Chưa cập nhật tên"}</h4>
-                    <div className="flex items-center text-slate-400 text-xs">
+                <div className="absolute right-0 top-full mt-2 w-72 bg-white border border-slate-200 rounded-xl shadow-2xl z-50 overflow-hidden transform origin-top-right transition-all">
+                  <div className="p-4 border-b border-slate-200 bg-slate-100/30">
+                    <h4 className="font-bold text-slate-800 text-lg mb-0.5">{user.full_name || "Chưa cập nhật tên"}</h4>
+                    <div className="flex items-center text-slate-500 text-xs">
                       <Mail size={12} className="mr-1" />
                       {user.email}
                     </div>
@@ -217,24 +217,24 @@ export default function DashboardPage() {
                     <div className="flex items-start gap-3 text-sm">
                       <div className="mt-0.5 text-brand-400"><Calendar size={16} /></div>
                       <div>
-                        <p className="text-slate-400 text-xs font-semibold mb-0.5">Ngày sinh</p>
-                        <p className="text-slate-200">{user.date_of_birth ? new Date(user.date_of_birth).toLocaleDateString('vi-VN') : "Chưa cập nhật"}</p>
+                        <p className="text-slate-500 text-xs font-semibold mb-0.5">Ngày sinh</p>
+                        <p className="text-slate-700">{user.date_of_birth ? new Date(user.date_of_birth).toLocaleDateString('vi-VN') : "Chưa cập nhật"}</p>
                       </div>
                     </div>
                     {user.role === "student" ? (
                       <div className="flex items-start gap-3 text-sm">
                         <div className="mt-0.5 text-brand-400"><MapPin size={16} /></div>
                         <div>
-                          <p className="text-slate-400 text-xs font-semibold mb-0.5">Trường học</p>
-                          <p className="text-slate-200">{user.school || "Chưa cập nhật"}</p>
+                          <p className="text-slate-500 text-xs font-semibold mb-0.5">Trường học</p>
+                          <p className="text-slate-700">{user.school || "Chưa cập nhật"}</p>
                         </div>
                       </div>
                     ) : (
                       <div className="flex items-start gap-3 text-sm">
                         <div className="mt-0.5 text-brand-400"><Briefcase size={16} /></div>
                         <div>
-                          <p className="text-slate-400 text-xs font-semibold mb-0.5">Nơi công tác</p>
-                          <p className="text-slate-200">{user.workplace || "Chưa cập nhật"}</p>
+                          <p className="text-slate-500 text-xs font-semibold mb-0.5">Nơi công tác</p>
+                          <p className="text-slate-700">{user.workplace || "Chưa cập nhật"}</p>
                         </div>
                       </div>
                     )}
@@ -244,7 +244,7 @@ export default function DashboardPage() {
             </div>
             <button
               onClick={logout}
-              className="p-2 text-slate-400 hover:text-red-400 hover:bg-slate-900 border border-transparent hover:border-slate-800 rounded-lg transition-all duration-200"
+              className="p-2 text-slate-500 hover:text-red-400 hover:bg-white border border-transparent hover:border-slate-200 rounded-lg transition-all duration-200"
               title="Đăng xuất"
             >
               <LogOut size={18} />
@@ -256,13 +256,13 @@ export default function DashboardPage() {
       {/* Main Container */}
       <main className="flex-grow max-w-7xl mx-auto w-full px-6 py-8 space-y-8">
         {/* Banner Card */}
-        <div className="relative glass-panel rounded-2xl border border-slate-800 p-6 md:p-8 overflow-hidden shadow-2xl">
+        <div className="relative glass-panel rounded-2xl border border-slate-200 p-6 md:p-8 overflow-hidden shadow-2xl">
           <div className="absolute -top-12 -right-12 w-48 h-48 rounded-full bg-brand-500/10 blur-3xl pointer-events-none" />
           <div className="relative z-10 max-w-2xl">
-            <h2 className="text-2xl md:text-3xl font-extrabold text-slate-100 leading-tight mb-2">
+            <h2 className="text-2xl md:text-3xl font-extrabold text-slate-800 leading-tight mb-2">
               Xin chào, {user.email}!
             </h2>
-            <p className="text-slate-400 text-sm md:text-base leading-relaxed mb-6">
+            <p className="text-slate-500 text-sm md:text-base leading-relaxed mb-6">
               {user.role === "teacher"
                 ? "Quản lý các lớp học của bạn, bóc tách đề thi vật lý PDF/Word bằng AI và theo dõi thống kê kết quả học sinh làm bài."
                 : "Tham gia các lớp học của giáo viên hoặc tự upload đề thi PDF/Word lên góc tự luyện tập để hệ thống AI tạo bài thi trực tuyến."}
@@ -293,7 +293,7 @@ export default function DashboardPage() {
 
         {/* Classes Section */}
         <section className="space-y-4">
-          <h3 className="text-lg font-bold text-slate-200 flex items-center gap-2">
+          <h3 className="text-lg font-bold text-slate-700 flex items-center gap-2">
             <BookOpen size={20} className="text-brand-400" />
             Danh sách lớp học
           </h3>
@@ -306,9 +306,9 @@ export default function DashboardPage() {
 
         {/* Exams Section (For Students) */}
         {user.role === "student" && classes.length > 0 && (
-          <section className="space-y-4 border-t border-slate-900 pt-8">
+          <section className="space-y-4 border-t border-slate-200 pt-8">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <h3 className="text-lg font-bold text-slate-200 flex items-center gap-2">
+              <h3 className="text-lg font-bold text-slate-700 flex items-center gap-2">
                 <FileText size={20} className="text-brand-400" />
                 Đề kiểm tra lớp học
               </h3>
@@ -324,7 +324,7 @@ export default function DashboardPage() {
                       className={`px-3 py-1.5 text-xs font-semibold rounded-lg shrink-0 border transition-all duration-200 ${
                         selectedClassId === cls.id
                           ? "bg-brand-500 border-brand-500 text-white shadow-md shadow-brand-500/10"
-                          : "bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700"
+                          : "bg-white border-slate-200 text-slate-500 hover:border-slate-300"
                       }`}
                     >
                       {cls.name}
@@ -336,7 +336,7 @@ export default function DashboardPage() {
             {examsLoading ? (
               <div className="text-center py-12"><span className="text-slate-500 text-sm">Đang tải đề thi...</span></div>
             ) : exams.length === 0 ? (
-              <div className="text-center py-12 bg-slate-900/10 border border-slate-800 rounded-xl">
+              <div className="text-center py-12 bg-white/10 border border-slate-200 rounded-xl">
                 <p className="text-slate-500 text-sm">Chưa có bài thi nào được giao trong lớp này.</p>
               </div>
             ) : (
@@ -351,7 +351,7 @@ export default function DashboardPage() {
 
         {/* Self-Practice Exams Section (For Students) */}
         {user.role === "student" && classes.some(c => c.subject === "Self-Practice") && (
-          <section className="space-y-4 border-t border-slate-900 pt-8">
+          <section className="space-y-4 border-t border-slate-200 pt-8">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-bold text-brand-400 flex items-center gap-2">
                 <FileText size={20} />
@@ -362,7 +362,7 @@ export default function DashboardPage() {
             {selfPracticeLoading ? (
               <div className="text-center py-12"><span className="text-slate-500 text-sm">Đang tải góc luyện tập...</span></div>
             ) : selfPracticeExams.length === 0 ? (
-              <div className="text-center py-12 bg-slate-900/10 border border-slate-800 rounded-xl">
+              <div className="text-center py-12 bg-white/10 border border-slate-200 rounded-xl">
                 <p className="text-slate-500 text-sm">Bạn chưa tải lên đề tự luyện nào.</p>
                 <Link href="/practice/upload" className="inline-block mt-3 text-brand-400 text-sm hover:underline">
                   Tải đề thi lên ngay
@@ -395,11 +395,11 @@ export default function DashboardPage() {
               required
             />
             <div className="w-full">
-              <label className="block text-sm font-medium text-slate-300 mb-1.5">Môn học</label>
+              <label className="block text-sm font-medium text-slate-600 mb-1.5">Môn học</label>
               <select
                 value={newClassSubject}
                 onChange={(e) => setNewClassSubject(e.target.value)}
-                className="w-full px-4 py-2.5 bg-slate-900 border border-slate-800 rounded-lg text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
               >
                 <option value="Toán">Toán Học</option>
                 <option value="Vật Lý">Vật Lý</option>

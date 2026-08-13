@@ -15,8 +15,8 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
 
   if (loading || !user || user.role !== "teacher") {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
-        <span className="text-slate-400">Đang xác thực quyền giáo viên...</span>
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <span className="text-slate-500">Đang xác thực quyền giáo viên...</span>
       </div>
     );
   }

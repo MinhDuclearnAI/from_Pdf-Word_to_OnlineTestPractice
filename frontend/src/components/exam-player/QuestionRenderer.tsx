@@ -94,33 +94,24 @@ export const QuestionRenderer: React.FC<QuestionRendererProps> = ({
     }
   };
 
-  // If this question contains a reading passage reference AND is not inside a passage group container
-  if (!isStandalonePassage && question.passage_ref && question.passage_ref.trim() !== "") {
-    return (
-      <ReadingSplitScreen 
-        title={question.part_title || "Đoạn văn đọc hiểu / Reading Passage"} 
-        passageText={question.passage_ref}
-      >
-        <div id={`question-card-${question.id}`} className="scroll-mt-6">
-          {renderQuestionComponent()}
-        </div>
-      </ReadingSplitScreen>
-    );
-  }
+  // Đối với các môn thường, nếu có passage_ref bị thừa (ví dụ "[Multiple Choice]"), ta sẽ bỏ qua không in ra Split Screen nữa.
+  // Các passage_ref hợp lệ và dài đã được ExamPlayer gom nhóm và tự bọc SplitScreen.
+  // Vì vậy QuestionRenderer chỉ tập trung render duy nhất câu hỏi.
+
 
   // Card render chuẩn trong danh sách cuộn liên tiếp
   return (
     <div 
       id={`question-card-${question.id}`} 
-      className="bg-slate-900/65 border border-slate-800/80 rounded-2xl p-5 md:p-6 shadow-xl transition-all duration-200 hover:border-brand-500/30 scroll-mt-6"
+      className="bg-white border border-slate-200/80 rounded-2xl p-5 md:p-6 shadow-sm transition-all duration-200 scroll-mt-6"
     >
       {questionNumber !== undefined && (
-        <div className="flex items-center justify-between mb-3 pb-2.5 border-b border-slate-800/60">
+        <div className="flex items-center justify-between mb-3 pb-2.5 border-b border-slate-200/60">
           <span className="text-xs font-bold text-brand-300 uppercase tracking-wider bg-brand-500/15 border border-brand-500/30 px-3 py-0.5 rounded-full shadow-sm">
             CÂU {questionNumber}
           </span>
           {question.part_title && (
-            <span className="text-xs text-slate-400 font-medium">{question.part_title}</span>
+            <span className="text-xs text-slate-500 font-medium">{question.part_title}</span>
           )}
         </div>
       )}

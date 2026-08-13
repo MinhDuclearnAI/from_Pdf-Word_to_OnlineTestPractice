@@ -69,15 +69,15 @@ export default function EditExamPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
-        <span className="text-slate-400">Đang tải thông tin đề kiểm tra...</span>
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <span className="text-slate-500">Đang tải thông tin đề kiểm tra...</span>
       </div>
     );
   }
 
   if (!exam) {
     return (
-      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 text-center">
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 text-center">
         <p className="text-red-400 mb-4 font-semibold">Không tìm thấy đề thi này.</p>
         <Link href="/dashboard" className="text-brand-400 hover:underline">Quay lại Dashboard</Link>
       </div>
@@ -87,11 +87,11 @@ export default function EditExamPage() {
   const redirectPath = exam.class_id ? `/classes/${exam.class_id}` : "/dashboard";
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between">
+    <div className="min-h-screen bg-slate-50 text-slate-800 flex flex-col justify-between">
       {/* Header */}
-      <header className="border-b border-slate-900 bg-slate-900/20 backdrop-blur-md sticky top-0 z-30">
+      <header className="border-b border-slate-200 bg-white/20 backdrop-blur-md sticky top-0 z-30">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <Link href={redirectPath} className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-200 transition-colors">
+          <Link href={redirectPath} className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-700 transition-colors">
             <ChevronLeft size={16} /> Quay lại lớp học
           </Link>
           <div className="flex gap-3">
@@ -125,9 +125,9 @@ export default function EditExamPage() {
       <main className="flex-grow max-w-7xl mx-auto w-full px-6 py-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Left Side: Questions list editor */}
         <div className="lg:col-span-2 space-y-6">
-          <div className="glass-panel rounded-2xl border border-slate-800 p-6 shadow-xl">
-            <h2 className="text-xl font-black text-slate-100 mb-1">{exam.title}</h2>
-            <p className="text-xs text-slate-400 uppercase font-semibold">Chỉnh sửa nội dung & đáp án</p>
+          <div className="glass-panel rounded-2xl border border-slate-200 p-6 shadow-xl">
+            <h2 className="text-xl font-black text-slate-800 mb-1">{exam.title}</h2>
+            <p className="text-xs text-slate-500 uppercase font-semibold">Chỉnh sửa nội dung & đáp án</p>
           </div>
 
           <QuestionReviewList
@@ -152,7 +152,7 @@ export default function EditExamPage() {
         </div>
       </main>
 
-      <footer className="max-w-7xl mx-auto w-full px-6 py-8 border-t border-slate-900 text-center text-xs text-slate-500">
+      <footer className="max-w-7xl mx-auto w-full px-6 py-8 border-t border-slate-200 text-center text-xs text-slate-500">
         AI Exam Platform • Trình biên tập nội dung đề kiểm tra.
       </footer>
     </div>

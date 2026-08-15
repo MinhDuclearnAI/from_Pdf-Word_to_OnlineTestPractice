@@ -22,6 +22,7 @@ interface QuestionRendererProps {
   onChange: (answer: any) => void;
   disabled?: boolean;
   isStandalonePassage?: boolean; // Nếu true, không tự động bọc ReadingSplitScreen (vì container cha đã bọc)
+  isEnglish?: boolean;  // Passed from ExamPlayer based on exam.subject — single source of truth
   childQuestions?: any[];
   childAnswers?: Record<string, any>;
   onChildAnswerChange?: (childId: string | number, answer: any) => void;
@@ -34,6 +35,7 @@ export const QuestionRenderer: React.FC<QuestionRendererProps> = ({
   onChange,
   disabled,
   isStandalonePassage = false,
+  isEnglish = false,
   childQuestions,
   childAnswers,
   onChildAnswerChange,
@@ -105,16 +107,20 @@ export const QuestionRenderer: React.FC<QuestionRendererProps> = ({
   // Vì vậy QuestionRenderer chỉ tập trung render duy nhất câu hỏi.
 
 
+  // Label prefix: determined by isEnglish prop (set by ExamPlayer from exam.subject)
+  const labelPrefix = isEnglish ? "QUESTION" : "CÂU";
+
+
   // Card render chuẩn trong danh sách cuộn liên tiếp
   return (
     <div 
       id={`question-card-${question.id}`} 
       className="bg-white border border-slate-200/80 rounded-2xl p-5 md:p-6 shadow-sm transition-all duration-200 scroll-mt-6"
     >
-      {questionNumber !== undefined && (
+      {questionNumber !== undefined && (!childQuestions || childQuestions.length === 0) && (
         <div className="flex items-center justify-between mb-3 pb-2.5 border-b border-slate-200/60">
           <span className="text-xs font-bold text-brand-300 uppercase tracking-wider bg-brand-500/15 border border-brand-500/30 px-3 py-0.5 rounded-full shadow-sm">
-            CÂU {questionNumber}
+            {labelPrefix} {questionNumber}
           </span>
           {question.part_title && (
             <span className="text-xs text-slate-500 font-medium">{question.part_title}</span>
@@ -122,8 +128,8 @@ export const QuestionRenderer: React.FC<QuestionRendererProps> = ({
         </div>
       )}
       
-      {/* Hiển thị Hình ảnh / Biểu đồ (nếu có) */}
-      {question.image_url && (
+      {/* Hiển thị Hình ảnh / Biểu đồ (nếu không phải là group question, vì group question sẽ pass xuống component con để render tối ưu) */}
+      {question.image_url && (!childQuestions || childQuestions.length === 0) && (
         <div className="mb-6 flex justify-center">
           <img 
             src={question.image_url} 
@@ -135,24 +141,24 @@ export const QuestionRenderer: React.FC<QuestionRendererProps> = ({
 
       {childQuestions && childQuestions.length > 0 ? (
         <div className="mt-2">
-          {/* Render Parent Instruction/Content */}
-          {question.component_type !== "table_completion" && question.component_type !== "summary_completion" && question.component_type !== "diagram_label_completion" && question.component_type !== "sentence_completion" && (
-             <div className="text-base font-medium text-slate-800 mb-4 whitespace-pre-wrap leading-relaxed">
-               {question.question_text}
-             </div>
-          )}
+          {/* MỚI: Render Red IELTS Badge cho Instruction */}
+          <div className="bg-[#e22f2f] text-white p-3 md:px-5 md:py-3.5 rounded-xl mb-6 shadow-sm flex flex-col md:flex-row md:items-center gap-2 md:gap-4 leading-relaxed">
+            <span className="font-bold text-[15px] whitespace-nowrap">{labelPrefix} {questionNumber}</span>
+            <span className="font-medium text-white/95 text-[15px]">{question.question_text}</span>
+          </div>
 
           {/* Render Children or Grouped Input */}
           {(question.component_type === "table_completion" || question.component_type === "summary_completion" || question.component_type === "diagram_label_completion" || question.component_type === "sentence_completion") ? (
              <FillBlankInput
                questionId={question.id}
-               questionText={question.question_text || ""}
+               questionText={""} // Pass rỗng vì đã render ở trên bằng Red Badge
                selectedAnswer={selectedAnswer}
                onChange={onChange}
                disabled={disabled}
                childQuestions={childQuestions}
                childAnswers={childAnswers}
                onChildAnswerChange={onChildAnswerChange}
+               imageUrl={question.image_url}
              />
           ) : (
              <div className="space-y-4 pt-4 border-t border-slate-100">
@@ -164,6 +170,7 @@ export const QuestionRenderer: React.FC<QuestionRendererProps> = ({
                    selectedAnswer={childAnswers?.[String(child.id)]}
                    onChange={(ans) => onChildAnswerChange && onChildAnswerChange(child.id, ans)}
                    disabled={disabled}
+                   isEnglish={isEnglish}
                  />
                ))}
              </div>

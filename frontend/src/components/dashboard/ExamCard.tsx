@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useRef, useEffect } from "react";
 import Link from "next/link";
-import { Clock, PlayCircle, MoreVertical, Trash2, CheckCircle } from "lucide-react";
+import { Clock, PlayCircle, MoreVertical, Trash2, CheckCircle, CalendarClock } from "lucide-react";
 import { SUBJECT_LABELS, TEST_TYPE_LABELS } from "@/lib/constants";
 
 interface ExamCardProps {
@@ -13,6 +13,7 @@ interface ExamCardProps {
     duration: number;
     open_at?: string;
     close_at?: string;
+    created_at?: string;  // ISO timestamp — ngày giờ upload đề
     score?: number;
   };
   role: "student" | "teacher";
@@ -22,6 +23,19 @@ interface ExamCardProps {
 export const ExamCard: React.FC<ExamCardProps> = ({ exam, role, onDelete }) => {
   const [showMenu, setShowMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  // Format timestamp: "14:32 · 16/08/2026"
+  const formattedDate = exam.created_at
+    ? (() => {
+        const d = new Date(exam.created_at);
+        const hh = d.getHours().toString().padStart(2, "0");
+        const mm = d.getMinutes().toString().padStart(2, "0");
+        const dd = d.getDate().toString().padStart(2, "0");
+        const mo = (d.getMonth() + 1).toString().padStart(2, "0");
+        const yy = d.getFullYear();
+        return `${hh}:${mm} · ${dd}/${mo}/${yy}`;
+      })()
+    : null;
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -75,9 +89,17 @@ export const ExamCard: React.FC<ExamCardProps> = ({ exam, role, onDelete }) => {
       </div>
 
       <div className="flex items-center justify-between border-t border-slate-200/60 pt-3.5">
-        <div className="flex items-center gap-1.5 text-xs text-slate-500">
-          <Clock size={14} />
-          <span>{exam.duration} phút</span>
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center gap-1.5 text-xs text-slate-500">
+            <Clock size={13} />
+            <span>{exam.duration ? `${exam.duration} phút` : "Không giới hạn"}</span>
+          </div>
+          {formattedDate && (
+            <div className="flex items-center gap-1.5 text-[11px] text-slate-400">
+              <CalendarClock size={11} />
+              <span>{formattedDate}</span>
+            </div>
+          )}
         </div>
 
         {role === "student" ? (

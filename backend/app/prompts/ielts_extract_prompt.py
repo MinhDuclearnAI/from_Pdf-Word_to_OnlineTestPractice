@@ -148,6 +148,12 @@ LUẬT THÉP VỀ CHIA BLOCK VÀ GỘP CÂU:
 - MỎ NEO CÂU HỎI: Trường `original_question_number` ở mỗi câu hỏi con là MỎ NEO BẮT BUỘC. Bạn phải đọc đúng số thứ tự của câu hỏi trên đề bài và điền vào đây (ví dụ 36). Tuyệt đối không tự đẻ thêm câu hỏi nếu không có số thứ tự rõ ràng trên đề.
 - Đối với câu hỏi Điền từ (Table, Summary, Diagram, Sentence Completion) mà có một dải câu hỏi (Ví dụ: "Questions 10-13"), bạn PHẢI gộp chúng vào CÙNG 1 BLOCK.
 - Đối với câu hỏi Trắc nghiệm, True/False độc lập, bạn vẫn gom chúng vào 1 BLOCK (ví dụ range_start=1, range_end=5), nhưng bên trong mảng `questions` phải chứa 5 object tách rời nhau, mỗi object chứa đúng 1 câu hỏi có `original_question_number` tương ứng.
+
+LUẬT ĐẶC BIỆT VỀ CÂU HỎI SHORT-ANSWER (Trả lời ngắn):
+- Đây là các câu hỏi riêng lẻ (không phải điền bảng/tóm tắt), mỗi câu có 1 câu hỏi rõ ràng (ví dụ: "What did the company sell in 1990?")
+- BẮT BUỘC: `question_text` của mỗi câu con PHẢI chứa nội dung câu hỏi thực sự. TUYỆT ĐỐI KHÔNG để trống hoặc chỉ viết "Question 14" hay số thứ tự.
+- Type của block phải là "sentence_completion" (không phải "fill_in_the_blank").
+- KHÔNG tự thêm bất kỳ từ nào như "[blank_1]", "[blank_2]" hay "___" vào `question_text` hay `instruction` của bất kỳ Block nào. Những mã này do hệ thống backend tự sinh ra, LLM KHÔNG được tự sinh ra.
 - VỀ HÌNH ẢNH: Bạn KHÔNG được tự bịa ra `image_url`. Chỉ điền khi bạn thực sự nhìn thấy thẻ `[[IMAGE_REF: https://...]]` nằm lẫn trong Raw Text.
 """
 

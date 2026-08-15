@@ -9,6 +9,7 @@ interface FillBlankInputProps {
   childQuestions?: any[];
   childAnswers?: Record<string, any>;
   onChildAnswerChange?: (childId: string | number, answer: any) => void;
+  imageUrl?: string;
 }
 
 export const FillBlankInput: React.FC<FillBlankInputProps> = ({
@@ -19,6 +20,7 @@ export const FillBlankInput: React.FC<FillBlankInputProps> = ({
   childQuestions,
   childAnswers,
   onChildAnswerChange,
+  imageUrl,
 }) => {
   // Hỗ trợ ___ hoặc [blank] hoặc [blank_1], [blank_2]
   const BLANK_REGEX = /___+|\[blank(?:_\d+)?\]/gi;
@@ -47,23 +49,36 @@ export const FillBlankInput: React.FC<FillBlankInputProps> = ({
       // Dạng hình ảnh thuần túy hoặc không có text đục lỗ, nhưng có childQuestions (từ block parent)
       return (
         <div className="w-full">
-          <div className="text-base font-medium text-slate-800 mb-6 whitespace-pre-wrap leading-relaxed">
-            {questionText}
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+          {questionText && (
+            <div className="text-base font-medium text-slate-800 mb-4 whitespace-pre-wrap leading-relaxed">
+              {questionText}
+            </div>
+          )}
+          
+          {imageUrl && (
+            <div className="mb-6 flex justify-center">
+              <img 
+                src={imageUrl} 
+                alt="Hình minh họa"
+                className="w-full max-w-3xl rounded-lg shadow-sm border border-slate-200/60 object-contain"
+              />
+            </div>
+          )}
+
+          <div className="flex flex-col gap-4">
             {childQuestions.map((child) => {
               const cAns = childAnswers?.[String(child.id)] || "";
               const qNum = child.displayNumber || child.original_question_number || "-";
               return (
-                <div key={child.id} className="flex items-center gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200">
-                  <span className="font-bold text-slate-700 bg-white px-2 py-1 rounded shadow-sm border border-slate-200">{qNum}</span>
+                <div key={child.id} className="flex items-center gap-3 bg-slate-50 px-3 py-2.5 rounded-xl border border-slate-200">
+                  <span className="font-bold text-slate-600 text-sm bg-white px-2 py-1 rounded-lg shadow-sm border border-slate-200 min-w-[28px] text-center flex-shrink-0">{qNum}</span>
                   <input
                     type="text"
                     disabled={disabled}
                     value={cAns}
                     onChange={(e) => onChildAnswerChange && onChildAnswerChange(child.id, e.target.value)}
-                    placeholder="Nhập câu trả lời..."
-                    className="flex-1 px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-500/50 transition-all font-medium placeholder:font-normal placeholder:text-slate-400"
+                    placeholder="Your answer..."
+                    className="w-full max-w-[220px] px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-500/50 transition-all font-medium text-sm placeholder:font-normal placeholder:text-slate-400"
                   />
                 </div>
               );
@@ -73,19 +88,23 @@ export const FillBlankInput: React.FC<FillBlankInputProps> = ({
       );
     }
 
+    // Trường hợp đơn: không có text đục lỗ, không có childQuestions
+    // → Câu hỏi short-answer: luôn luôn phải hiện câu hỏi rồi mới đến ô trống
     const singleAns = typeof selectedAnswer === "string" ? selectedAnswer : "";
     return (
       <div className="w-full">
-        <h3 className="text-base font-semibold text-slate-800 mb-3 whitespace-pre-wrap leading-relaxed">
-          {questionText}
-        </h3>
+        {questionText && (
+          <p className="text-base font-semibold text-slate-800 mb-4 whitespace-pre-wrap leading-relaxed">
+            {questionText}
+          </p>
+        )}
         <input
           type="text"
           disabled={disabled}
           value={singleAns}
           onChange={(e) => onChange(e.target.value)}
-          placeholder="Nhập câu trả lời điền khuyết..."
-          className="w-full max-w-md px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/30 transition-all shadow-sm"
+          placeholder="Your answer..."
+          className="w-full max-w-sm px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/30 transition-all shadow-sm text-sm"
         />
       </div>
     );
@@ -109,7 +128,7 @@ export const FillBlankInput: React.FC<FillBlankInputProps> = ({
                 value={answersList[index] || ""}
                 onChange={(e) => handleInputChange(index, e.target.value)}
                 placeholder={`${index + 1}`}
-                className="inline-block mx-1 px-2 py-1 bg-white border border-slate-300 rounded-md text-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 text-center font-bold text-sm min-w-[80px] w-auto max-w-full transition-all shadow-sm align-middle placeholder:text-slate-300 placeholder:font-normal"
+                className="inline-block mx-1 px-2 py-0.5 bg-white border border-slate-300 rounded-md text-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 text-center font-bold text-sm min-w-[60px] w-[80px] max-w-[120px] transition-all shadow-sm align-middle placeholder:text-slate-300 placeholder:font-normal"
               />
             )}
           </React.Fragment>

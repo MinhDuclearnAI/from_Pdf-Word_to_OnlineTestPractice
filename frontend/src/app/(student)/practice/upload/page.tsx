@@ -4,32 +4,45 @@ import { useRouter } from "next/navigation";
 import FileDropzone from "@/components/upload/FileDropzone";
 import AIProcessingStatus from "@/components/upload/AIProcessingStatus";
 import apiClient from "@/lib/api-client";
-import { ChevronLeft, Brain, GraduationCap } from "lucide-react";
+import { ChevronLeft, Brain, GraduationCap, Clock } from "lucide-react";
 import Link from "next/link";
+
+const SUBJECT_OPTIONS = [
+  { value: "IELTS", label: "IELTS Reading / Listening" },
+  { value: "Toán Học", label: "Toán Học" },
+  { value: "Vật Lý", label: "Vật Lý" },
+  { value: "Hóa Học", label: "Hóa Học" },
+  { value: "Sinh Học", label: "Sinh Học" },
+  { value: "Tiếng Anh", label: "Tiếng Anh (THPT Quốc Gia)" },
+  { value: "Lịch Sử", label: "Lịch Sử" },
+  { value: "Địa Lý", label: "Địa Lý" },
+  { value: "GDCD", label: "Giáo Dục Công Dân (GDCD)" },
+  { value: "HSA", label: "Đánh Giá Năng Lực (HSA)" },
+];
 
 export default function PracticeUploadPage() {
   const router = useRouter();
   const [subject, setSubject] = useState("");
+  const [duration, setDuration] = useState<string>("");
   const [jobId, setJobId] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleFileSelect = async (file: File) => {
     if (!subject) {
-      setError("Vui lòng chọn môn học/loại đề trước khi tải tệp lên.");
+      setError("Vui lòng chọn môn học / loại đề trước khi tải file lên.");
       return;
     }
-    
     setLoading(true);
     setError(null);
     try {
       const formData = new FormData();
       formData.append("file", file);
       formData.append("subject", subject);
-
-      // Call student quick upload endpoint
+      if (duration && parseInt(duration) > 0) {
+        formData.append("duration", duration);
+      }
       const { data } = await apiClient.post("/practice/upload-quick", formData);
-
       setJobId(data.job_id);
     } catch (e: any) {
       console.error("Failed to upload file:", e);
@@ -73,25 +86,53 @@ export default function PracticeUploadPage() {
         )}
 
         {!jobId ? (
-          <div className="space-y-6">
-            <div className="bg-white/40 p-5 border border-slate-200 rounded-xl">
-              <label className="block text-sm font-medium text-slate-600 mb-2">Loại đề / Môn học</label>
-              <select
-                value={subject}
-                onChange={(e) => setSubject(e.target.value)}
-                className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
-                disabled={loading}
-              >
-                <option value="" disabled>-- Chọn loại đề --</option>
-                <option value="IELTS">IELTS (Có chia màn hình Reading)</option>
-                <option value="Toán Học">Toán Học (Làm bài tập trung)</option>
-                <option value="Vật Lý">Vật Lý</option>
-                <option value="Hóa Học">Hóa Học</option>
-                <option value="Tiếng Anh">Tiếng Anh (THPT Quốc Gia)</option>
-                <option value="Self-Practice">Khác (Tự động nhận diện)</option>
-              </select>
+          <div className="space-y-4">
+            {/* Subject + Duration card */}
+            <div className="bg-white p-5 border border-slate-200 rounded-2xl shadow-sm space-y-4">
+              {/* Subject select */}
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">
+                  Môn học / Loại đề <span className="text-red-400">*</span>
+                </label>
+                <select
+                  value={subject}
+                  onChange={(e) => setSubject(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-400 transition-all text-sm"
+                  disabled={loading}
+                >
+                  <option value="" disabled>-- Chọn môn học --</option>
+                  {SUBJECT_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Duration */}
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                  <span className="flex items-center gap-1.5">
+                    <Clock size={14} className="text-slate-400" />
+                    Thời gian làm bài (phút)
+                    <span className="text-xs font-normal text-slate-400">— để trống để AI tự phân tích</span>
+                  </span>
+                </label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    min={5}
+                    max={300}
+                    value={duration}
+                    onChange={(e) => setDuration(e.target.value)}
+                    placeholder="Ví dụ: 60"
+                    disabled={loading}
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-400 transition-all text-sm pr-16"
+                  />
+                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-slate-400 font-medium pointer-events-none">phút</span>
+                </div>
+              </div>
             </div>
-            
+
+            {/* File dropzone */}
             <div className={!subject ? "opacity-50 pointer-events-none" : ""}>
               <FileDropzone onFileSelect={handleFileSelect} disabled={loading || !subject} />
             </div>
@@ -111,8 +152,8 @@ export default function PracticeUploadPage() {
         )}
       </main>
 
-      <footer className="max-w-7xl mx-auto w-full px-6 py-8 border-t border-slate-200 text-center text-xs text-slate-500">
-        AI bóc tách đề thi hỗ trợ file PDF gốc, PDF scan, Word (DOCX/DOC).
+      <footer className="max-w-7xl mx-auto w-full px-6 py-6 border-t border-slate-200 text-center text-xs text-slate-400">
+        AI bóc tách đề thi hỗ trợ PDF gốc, PDF scan, Word (DOCX/DOC). Dữ liệu của bạn được bảo mật.
       </footer>
     </div>
   );

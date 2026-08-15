@@ -34,6 +34,12 @@ interface ExamPlayerProps {
 
 export const ExamPlayer: React.FC<ExamPlayerProps> = ({ exam, questions: rawQuestions, examId }) => {
   const router = useRouter();
+
+  // Single source of truth for English/IELTS language detection
+  const isEnglishExam = ["ielts", "english", "tiếng anh"].some(
+    (kw) => (exam?.subject || "").toLowerCase().includes(kw)
+  );
+
   const {
     answers,
     setAnswer,
@@ -402,6 +408,7 @@ export const ExamPlayer: React.FC<ExamPlayerProps> = ({ exam, questions: rawQues
                   onChange={(ans) => handleAnswerChange(item.id, ans)}
                   disabled={isSubmitting}
                   isStandalonePassage={true}
+                  isEnglish={isEnglishExam}
                   childQuestions={isBlockParent(item.id) ? actualQuestions.filter(child => String(child.parent_id) === String(item.id)).sort((a,b) => (a.id > b.id ? 1 : -1)) : undefined}
                   childAnswers={answers}
                   onChildAnswerChange={handleAnswerChange}
@@ -433,6 +440,7 @@ export const ExamPlayer: React.FC<ExamPlayerProps> = ({ exam, questions: rawQues
                     selectedAnswer={answers[String(item.id)]}
                     onChange={(ans) => handleAnswerChange(item.id, ans)}
                     disabled={isSubmitting}
+                    isEnglish={isEnglishExam}
                     childQuestions={isBlockParent(item.id) ? actualQuestions.filter(child => String(child.parent_id) === String(item.id)).sort((a,b) => (a.id > b.id ? 1 : -1)) : undefined}
                     childAnswers={answers}
                     onChildAnswerChange={handleAnswerChange}
@@ -555,7 +563,7 @@ export const ExamPlayer: React.FC<ExamPlayerProps> = ({ exam, questions: rawQues
         <div className="flex items-center gap-2 md:gap-3">
            {isIELTSReadingFormat && activeGroup ? (
              <div className="hidden sm:flex items-center text-sm font-semibold text-slate-500 mr-2">
-               Câu {
+               {isEnglishExam ? "Question" : "Câu"} {
                  (() => {
                    const groupActuals = actualQuestions.filter(aq => activeGroup.questions.some(gq => gq.item.id === aq.id || aq.parent_id === gq.item.id));
                    if (groupActuals.length === 0) return "-";

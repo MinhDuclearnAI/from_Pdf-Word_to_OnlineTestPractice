@@ -333,9 +333,20 @@ def process_exam_upload_task(self, job_id: int, class_id: int, title: str, subje
             if not document_text or len(document_text.strip()) < 50:
                 raise ValueError("Không thể trích xuất văn bản từ file hoặc file quá ngắn.")
 
-            # Giai đoạn 0: Kiểm kê trang (chỉ dành cho PDF)
+            # Giai đoạn 0: Build page_assets map để dùng fallback map ảnh Raster chắc chắn hơn LLM
+            page_assets: dict = {}  # {page_num: [image_url, ...]}
             if mime_type == "application/pdf":
                 notification.publish_job_status(job_id, "processing", 42, "Đang trích xuất văn bản và hình ảnh inline...")
+                try:
+                    from app.services.file_extractor import inventory_page, extract_all_images_from_inventory
+                    _inventory = inventory_page(local_file_path)
+                    _assets = extract_all_images_from_inventory(local_file_path, _inventory)
+                    for _a in _assets:
+                        _p = _a["page"]
+                        page_assets.setdefault(_p, []).append(_a["image_url"])
+                    logger.info(f"[ImageMap] Đã build page_assets: {len(_assets)} ảnh trên {len(page_assets)} trang")
+                except Exception as _img_err:
+                    logger.warning(f"[ImageMap] Không thể build page_assets: {_img_err}")
             
             # 6. Pass 2: Bóc tách từng câu hỏi qua AI
             notification.publish_job_status(job_id, "processing", 60, "AI đang bóc tách từng câu hỏi và gán nhãn...")
@@ -382,26 +393,64 @@ def process_exam_upload_task(self, job_id: int, class_id: int, title: str, subje
                             instruction = block.instruction if block.instruction else ""
                             b_content = block.block_content if block.block_content else ""
                             range_text = f"**Questions {block.range_start}-{block.range_end}**" if block.range_start and block.range_end else ""
+
+                            # Strip [[IMAGE_REF: url]] from text fields — these are internal pipeline markers,
+                            # must NEVER appear in the Red Badge or question text shown to students
+                            import re as _re
+                            _IMAGE_REF_PATTERN = _re.compile(r'\[\[IMAGE_REF:\s*[^\]]+\]\]', _re.IGNORECASE)
+                            instruction = _IMAGE_REF_PATTERN.sub('', instruction).strip()
+                            b_content = _IMAGE_REF_PATTERN.sub('', b_content).strip()
                             
-                            # LLM-Assisted Table Cropping
+                            # ===== DETERMINISTIC IMAGE MAPPING (ưu tiên tuyệt đối) =====
+                            # Bước 1: Nếu LLM đã trích xuất được image_url từ [[IMAGE_REF:...]] → giữ nguyên
+                            # Bước 2: Nếu LLM quên → dùng page_assets để map ảnh Raster theo trang chứa instruction
+                            if not img_url and block.type in ["table_completion", "diagram_label_completion", "matching_features"]:
+                                if page_assets:
+                                    import fitz as _fitz
+                                    try:
+                                        _doc = _fitz.open(local_file_path)
+                                        _found_page = None
+                                        # Tìm trang đầu tiên chứa instruction text
+                                        _search_text = instruction[:80] if instruction else (b_content[:80] if b_content else "")
+                                        if _search_text:
+                                            for _pn in range(len(_doc)):
+                                                _pg = _doc.load_page(_pn)
+                                                if _pg.search_for(_search_text):
+                                                    _found_page = _pn
+                                                    break
+                                        _doc.close()
+                                        # Nếu tìm thấy trang, lấy ảnh đầu tiên của trang đó
+                                        if _found_page is not None and _found_page in page_assets:
+                                            img_url = page_assets[_found_page][0]
+                                            logger.info(f"[ImageMap] Gán ảnh Raster từ trang {_found_page} cho block '{block.block_id}'")
+                                        elif _found_page is not None:
+                                            # Thử trang kề (ảnh thường nằm trang sau instruction)
+                                            if (_found_page + 1) in page_assets:
+                                                img_url = page_assets[_found_page + 1][0]
+                                                logger.info(f"[ImageMap] Gán ảnh Raster từ trang kề {_found_page+1} cho block '{block.block_id}'")
+                                    except Exception as _map_err:
+                                        logger.warning(f"[ImageMap] Lỗi khi map ảnh theo trang: {_map_err}")
+                            
+                            # Bước 3: Chỉ khi vẫn không có ảnh → fallback crop Vector bằng LLM
                             if not img_url and block.type in ["table_completion", "diagram_label_completion", "matching_features"]:
                                 img_url = crop_table_via_llm(local_file_path, b_content, instruction)
                             
                             # Visual Override: Nếu có ảnh và là dạng bảng/sơ đồ, bỏ qua OCR text
                             if block.type in groupable_types:
                                 if img_url and block.type in ["table_completion", "diagram_label_completion", "matching_features"]:
-                                    blanks = "\n".join([f"[blank_{i}]" for i in range(1, q_count + 1)])
-                                    q_text = f"{range_text}\n\n{instruction}\n\n{blanks}"
+                                    # Có ảnh: chỉ giữ instruction, KHÔNG thêm [blank_N] vào question_text
+                                    # Frontend sẽ dùng childQuestions để render Grid Inputs
+                                    q_text = instruction.strip()
                                 else:
                                     # Tránh bị đúp ô trống: chỉ thêm [blank] nếu trong text KHÔNG CÓ sẵn ___
                                     if "___" not in b_content and "[blank" not in b_content:
                                         blanks = "\n".join([f"[blank_{i}]" for i in range(1, q_count + 1)])
-                                        q_text = f"{range_text}\n\n{instruction}\n\n{b_content}\n\n{blanks}"
+                                        q_text = f"{instruction}\n\n{b_content}\n\n{blanks}".strip()
                                     else:
-                                        q_text = f"{range_text}\n\n{instruction}\n\n{b_content}"
+                                        q_text = f"{instruction}\n\n{b_content}".strip()
                             else:
-                                # Not groupable (e.g. TFNG) -> Just show instruction and b_content
-                                q_text = f"{range_text}\n\n{instruction}\n\n{b_content}".strip()
+                                # Not groupable (e.g. TFNG, short_answer) -> show instruction + b_content
+                                q_text = f"{instruction}\n\n{b_content}".strip()
                             
                             answers = [getattr(q, 'correct_answer', '') for q in block.questions]
                             import json
@@ -511,8 +560,37 @@ def process_exam_upload_task(self, job_id: int, class_id: int, title: str, subje
                     raise Exception(f"Lỗi Bóc Tách: Đề thi IELTS chuẩn phải có khoảng 40 câu hỏi. Hệ thống hiện tại nhận diện được {total_parsed} câu. Vui lòng kiểm tra lại các đánh số câu hỏi trong file PDF.")
             
             else:
-                # Báo lỗi vì các file "vibe code" hỗ trợ nhánh này đã bị xoá theo yêu cầu
-                raise NotImplementedError("Tính năng bóc tách cho các môn không phải IELTS tạm thời bị vô hiệu hoá vì file block_detector và passage_segmenter đã bị xoá.")
+                # NHÁNH STANDARD (Generic)
+                notification.publish_job_status(job_id, "processing", 50, "AI đang đọc và bóc tách toàn bộ đề thi (1 Request)...")
+                parsed_exam_standard = ai_parser.extract_batched_blocks(document_text, subject=real_subject)
+                
+                if not parsed_exam_standard or not parsed_exam_standard.questions:
+                    raise Exception("Lỗi Bóc Tách: AI không thể nhận diện được câu hỏi nào từ file này.")
+                    
+                import re as _re
+                _IMAGE_REF_PATTERN = _re.compile(r'\[\[IMAGE_REF:\s*[^\]]+\]\]', _re.IGNORECASE)
+
+                for q_idx, q in enumerate(parsed_exam_standard.questions):
+                    orig_num = getattr(q, 'original_question_number', None)
+                    if orig_num is None:
+                        orig_num = q_idx + 1
+
+                    final_type = getattr(q, 'type', "multiple_choice")
+                    final_options = getattr(q, 'options', [])
+                    
+                    q_text_clean = _IMAGE_REF_PATTERN.sub('', q.question_text).strip() if q.question_text else ""
+
+                    q_schema = QuestionSchema(
+                        id=q.id if getattr(q, 'id', None) else f"q_{q_idx}",
+                        original_question_number=orig_num,
+                        type=final_type,
+                        question_text=q_text_clean,
+                        options=final_options,
+                        correct_answer=getattr(q, 'correct_answer', ""),
+                        image_url=getattr(q, 'image_url', None),
+                        part_title=getattr(q, 'part_title', None)
+                    )
+                    master_questions.append(q_schema)
 
 
             # 7. Lưu dữ liệu vào Database

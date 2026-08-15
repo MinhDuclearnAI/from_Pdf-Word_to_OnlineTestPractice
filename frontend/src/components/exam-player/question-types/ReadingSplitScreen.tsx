@@ -21,7 +21,16 @@ export const ReadingSplitScreen: React.FC<ReadingSplitScreenProps> = ({
           </h4>
         </div>
         <div className="p-6 md:p-8 whitespace-pre-wrap font-medium leading-relaxed tracking-wide text-justify select-text text-[15px] md">
-          {passageText}
+          {passageText.split(/(\*\*.*?\*\*)/g).map((part, index) => {
+            if (part.startsWith('**') && part.endsWith('**')) {
+              return (
+                <strong key={index} className="block text-[22px] md:text-2xl font-black text-center text-slate-900 my-8 uppercase tracking-wide">
+                  {part.slice(2, -2)}
+                </strong>
+              );
+            }
+            return <span key={index}>{part}</span>;
+          })}
         </div>
       </div>
 

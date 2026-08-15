@@ -75,8 +75,9 @@ def _get_or_create_personal_workspace(db: Session, student: User) -> int:
 def upload_self_practice_exam(
     file: UploadFile = File(...),
     subject: str = Form("Self-Practice"),
+    duration: int = Form(60),  # Thời gian làm bài (phút), mặc định 60 phút
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user) # Chấp nhận cả role 'student'
+    current_user: User = Depends(get_current_user)
 ):
     """
     API dành cho Học sinh tự tải file đề thi (PDF/DOCX) lên để hệ thống AI 
@@ -118,7 +119,7 @@ def upload_self_practice_exam(
             class_id=personal_class_id,
             title=f"Đề tự luyện - {title_without_ext}",
             subject=subject,
-            duration=60,
+            duration=max(5, min(duration, 300)),  # Giới hạn an toàn: 5-300 phút
             test_type="practice"
         )
 

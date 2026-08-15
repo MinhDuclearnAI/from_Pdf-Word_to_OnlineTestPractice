@@ -5,9 +5,10 @@ import { ChevronRight, ChevronLeft, Flag } from "lucide-react";
 interface QuestionNavigatorProps {
   questions: Array<{ id: string | number; [key: string]: any }>;
   onSelectQuestion?: (index: number, questionId: string) => void;
+  isEnglish?: boolean;
 }
 
-export const QuestionNavigator: React.FC<QuestionNavigatorProps> = ({ questions, onSelectQuestion }) => {
+export const QuestionNavigator: React.FC<QuestionNavigatorProps> = ({ questions, onSelectQuestion, isEnglish = false }) => {
   const { currentIndex, setCurrentIndex, answers, flaggedQuestions, toggleFlag } = useExamStore();
   const [isCollapsed, setIsCollapsed] = useState(false);
 
@@ -32,6 +33,9 @@ export const QuestionNavigator: React.FC<QuestionNavigatorProps> = ({ questions,
     toggleFlag(index);
   };
 
+  const labelPrefix = isEnglish ? "QUESTION" : "CÂU HỎI";
+  const shortLabel = isEnglish ? "Question" : "Câu";
+
   if (isCollapsed) {
     return (
       <div className="bg-white/80 border border-slate-200/80 rounded-2xl p-2 shadow-2xl backdrop-blur flex flex-col items-center gap-3">
@@ -44,7 +48,7 @@ export const QuestionNavigator: React.FC<QuestionNavigatorProps> = ({ questions,
           <ChevronLeft size={18} />
         </button>
         <span className="text-[10px] font-bold text-slate-600 writing-vertical rotate-180 tracking-wider">
-          CÂU HỎI ({answeredCount}/{questions.length})
+          {labelPrefix} ({answeredCount}/{questions.length})
         </span>
       </div>
     );
@@ -55,7 +59,7 @@ export const QuestionNavigator: React.FC<QuestionNavigatorProps> = ({ questions,
       <div className="flex items-center justify-between pb-2.5 mb-3 border-b border-slate-200/70">
         <div>
           <h4 className="font-bold text-slate-800 text-xs uppercase tracking-wide">
-            Câu hỏi
+            {labelPrefix}
           </h4>
           <span className="text-[11px] text-brand-400 font-semibold">
             {answeredCount}/{questions.length} đã làm
@@ -85,7 +89,7 @@ export const QuestionNavigator: React.FC<QuestionNavigatorProps> = ({ questions,
               type="button"
               onClick={() => handleSelect(index, qId)}
               onContextMenu={(e) => handleContextMenu(e, index)}
-              title={`Câu ${index + 1} - Trái: Chọn | Phải: Gắn cờ`}
+              title={`${shortLabel} ${index + 1} - Trái: Chọn | Phải: Gắn cờ`}
               className={`relative flex items-center justify-center h-8 w-full rounded-md text-xs transition-all duration-150 border select-none ${
                 isCurrent && isAnswered
                   ? "border-brand-700 text-white bg-brand-700 shadow-md ring-2 ring-brand-700/30 font-black scale-105 z-10"

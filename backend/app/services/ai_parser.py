@@ -61,17 +61,28 @@ class AIParserService:
                 logger.error(f"Lỗi kết nối API khi phân loại tài liệu: {str(e)}")
                 raise FileParsingError("Hệ thống AI hiện đang bận, vui lòng thử lại sau.")
 
-    def extract_questions(self, raw_text: str) -> ExamExtractionSchema:
+
+    def extract_batched_blocks(self, batched_text: str, visual_assets_context: str = "", subject: str = "") -> ExamExtractionSchema:
         """
-        Quét toàn bộ text của tài liệu và bóc tách thành danh sách các câu hỏi chuẩn JSON.
-        Áp dụng cơ chế Smart Retry: Feed lỗi Pydantic ngược lại LLM để tự sửa sai.
+        Tầng 3: Nhận vào chuỗi chứa nhiều blocks đã được thêm delimiter và yêu cầu AI bóc tách.
         """
         attempt = 0
         
-        # Khởi tạo ngữ cảnh hội thoại linh hoạt cho phép đẩy thêm log lỗi vào sau này
+        content_with_assets = batched_text
+        if visual_assets_context:
+            content_with_assets = f"THÔNG TIN HÌNH ẢNH:\n{visual_assets_context}\n\n{batched_text}"
+        
+        if subject and subject.upper() == "IELTS":
+            from app.prompts.ielts_extract_prompt import IELTS_EXTRACT_SYSTEM_PROMPT, get_ielts_extraction_prompt
+            sys_prompt = IELTS_EXTRACT_SYSTEM_PROMPT
+            user_prompt = get_ielts_extraction_prompt(content_with_assets)
+        else:
+            sys_prompt = EXTRACT_SYSTEM_PROMPT
+            user_prompt = get_extraction_prompt(content_with_assets)
+            
         messages = [
-            {"role": "system", "content": EXTRACT_SYSTEM_PROMPT},
-            {"role": "user", "content": get_extraction_prompt(raw_text)}
+            {"role": "system", "content": sys_prompt},
+            {"role": "user", "content": user_prompt}
         ]
 
         while attempt < self.max_retries:
@@ -80,42 +91,82 @@ class AIParserService:
                     model=self.extractor_model,
                     messages=messages,
                     temperature=0.1,
-                    max_tokens=8192,
-                    response_format={"type": "json_object"}  # Đã BỔ SUNG ép kiểu JSON
+                    max_tokens=8192, # Đã tăng lên vì batch
+                    response_format={"type": "json_object"}
                 )
                 
                 raw_json = response.choices[0].message.content
-                
-                # Gọi hàm helper để validate list các câu hỏi
                 parsed_exam = safe_json_parse(raw_json, ExamExtractionSchema)
                 
-                logger.info(f"Bóc tách thành công {len(parsed_exam.questions)} câu hỏi (sau {attempt + 1} lần gọi).")
+                logger.debug(f"Bóc tách thành công batched blocks (sau {attempt + 1} lần gọi).")
                 return parsed_exam
 
             except ValidationError as e:
                 attempt += 1
-                logger.warning(f"Lần {attempt}: Sai format JSON. Lỗi chi tiết:\n{e}")
+                logger.warning(f"Lần {attempt} (Batched Blocks): Sai format JSON. Lỗi:\n{e}")
                 
                 if attempt >= self.max_retries:
-                    logger.error("Đã hết số lần thử lại (retries) do sai format Schema liên tục.")
-                    raise FileParsingError("Không thể chuẩn hóa dữ liệu câu hỏi từ file tải lên.")
+                    logger.error(f"Đã hết số lần thử lại cho Batched Blocks.")
+                    return ExamExtractionSchema(questions=[])
                 
-                # --- [FIX]: SMART RETRY LOGIC ---
-                # Nạp JSON bị lỗi vào context đóng vai trò là "câu trả lời cũ của AI"
                 messages.append({"role": "assistant", "content": raw_json if raw_json else "{}"})
-                
-                # Cung cấp log lỗi từ Pydantic và ép LLM sửa lại
                 error_feedback = (
-                    f"Kết quả JSON vừa rồi của bạn bị lỗi cấu trúc (Schema ValidationError):\n{str(e)}\n"
-                    f"Dựa vào thông báo lỗi trên, hãy sửa lại JSON cho chuẩn xác. "
-                    f"CHỈ TRẢ VỀ JSON, KHÔNG KÈM THEO BẤT KỲ VĂN BẢN GIẢI THÍCH NÀO KHÁC."
+                    f"Kết quả JSON vừa rồi bị lỗi Schema ValidationError:\n{str(e)}\n"
+                    f"Hãy sửa lại JSON. CHỈ TRẢ VỀ JSON."
                 )
                 messages.append({"role": "user", "content": error_feedback})
-                # ---------------------------------
 
             except Exception as e:
-                logger.error(f"Lỗi API khi bóc tách câu hỏi: {str(e)}", exc_info=True)
-                raise FileParsingError("Lỗi giao tiếp với máy chủ AI.")
+                logger.error(f"Lỗi API khi bóc tách batched blocks: {str(e)}", exc_info=True)
+                return ExamExtractionSchema(questions=[])
+
+    def extract_ielts_full_document(self, document_text: str) -> 'IELTSExamSchema':
+        """
+        Gửi toàn bộ Raw Text của PDF lên LLM để bóc tách toàn bộ cấu trúc 3 Passages và các Blocks (Range) câu hỏi.
+        """
+        from app.prompts.ielts_extract_prompt import IELTS_FULL_SYSTEM_PROMPT, get_ielts_full_prompt
+        from app.schemas.question import IELTSExamSchema
+        
+        attempt = 0
+        messages = [
+            {"role": "system", "content": IELTS_FULL_SYSTEM_PROMPT},
+            {"role": "user", "content": get_ielts_full_prompt(document_text)}
+        ]
+
+        while attempt < self.max_retries:
+            try:
+                response = self.client.chat.completions.create(
+                    model=self.extractor_model,
+                    messages=messages,
+                    temperature=0.1,
+                    max_tokens=8192, 
+                    response_format={"type": "json_object"}
+                )
+                
+                raw_json = response.choices[0].message.content
+                parsed_exam = safe_json_parse(raw_json, IELTSExamSchema)
+                
+                logger.debug(f"Bóc tách thành công IELTS Full Document (sau {attempt + 1} lần gọi).")
+                return parsed_exam
+
+            except ValidationError as e:
+                attempt += 1
+                logger.warning(f"Lần {attempt} (IELTS Full): Sai format JSON. Lỗi:\n{e}")
+                
+                if attempt >= self.max_retries:
+                    logger.error(f"Đã hết số lần thử lại cho IELTS Full Document.")
+                    raise FileParsingError("Không thể bóc tách cấu trúc IELTS theo chuẩn.")
+                
+                messages.append({"role": "assistant", "content": raw_json if raw_json else "{}"})
+                error_feedback = (
+                    f"Kết quả JSON vừa rồi bị lỗi Schema ValidationError:\n{str(e)}\n"
+                    f"Hãy sửa lại JSON. Nhớ ĐẢM BẢO đúng 3 passages, 40 câu hỏi, và đúng định dạng schema."
+                )
+                messages.append({"role": "user", "content": error_feedback})
+
+            except Exception as e:
+                logger.error(f"Lỗi API khi bóc tách IELTS Full Document: {str(e)}", exc_info=True)
+                raise FileParsingError(f"Hệ thống AI lỗi: {str(e)}")
 
 # Khởi tạo instance duy nhất (Singleton pattern) để import vào Celery Tasks
 ai_parser = AIParserService()

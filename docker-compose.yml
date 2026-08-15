@@ -70,7 +70,11 @@ services:
         condition: service_healthy
     volumes:
       - ./backend:/app               # mount code -> hot reload khi dev, không cần rebuild
-    command: sh -c "alembic upgrade head && python initial_data.py && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+    command: >
+      sh -c "alembic upgrade head &&
+      (alembic check || (alembic revision --autogenerate -m 'auto_sync' && alembic upgrade head)) &&
+      python initial_data.py &&
+      uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
 
   worker:
     build: ./backend                # dùng CHUNG Dockerfile với backend, chỉ khác command chạy

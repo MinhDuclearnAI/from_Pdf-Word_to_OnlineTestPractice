@@ -178,12 +178,13 @@
 #             # Không che lỗi nghiệp vụ bằng trạng thái Celery "succeeded".
 #             # Khi không phải một retry đang chờ, task phải được ghi nhận thất bại.
 #             raise
-
 import os
 import logging
 from typing import Any
 import mimetypes
-
+import fitz
+import json
+from io import BytesIO
 # Import Celery instance đã được cấu hình
 from app.core.celery_app import celery_app
 
@@ -194,16 +195,85 @@ from app.db.session import get_db_session
 from app.models.ai_job import AIProcessingJob
 from app.models.exam import Exam
 from app.models.question import Question
+from app.schemas.question import QuestionSchema
 
 # Import Services
 from app.services.storage_service import storage
 from app.services.notification_service import notification
 
-# Giả định bạn có các module sau trong services (Dựa trên cấu trúc Giai đoạn 2)
 from app.services import file_extractor
 from app.services.ai_parser import ai_parser
+# from app.services.passage_segmenter import segment_document
+# from app.services.block_detector import detect_blocks
 
 logger = logging.getLogger(__name__)
+
+def crop_table_via_llm(pdf_path: str, block_content: str) -> str:
+    """Helper function to find table bounds using LLM and crop it."""
+    try:
+        if not block_content or len(block_content.strip()) < 10:
+            return None
+            
+        doc = fitz.open(pdf_path)
+        page_num_hint = -1
+        # Search for first 3 valid words to find the page
+        words = [w for w in block_content.replace("|", " ").replace("-", " ").split() if len(w) > 4]
+        if len(words) >= 2:
+            for p_num in range(len(doc)):
+                text = doc.load_page(p_num).get_text()
+                if words[0] in text and words[1] in text:
+                    page_num_hint = p_num
+                    break
+        
+        if page_num_hint < 0 or page_num_hint >= len(doc):
+            return None
+            
+        page = doc.load_page(page_num_hint)
+        blocks = page.get_text("blocks", sort=True)
+        
+        # Build text map with coordinates
+        lines = []
+        for b in blocks:
+            if b[6] == 0: # text
+                lines.append(f"[Y0: {b[1]:.1f}, Y1: {b[3]:.1f}] {b[4].strip()}")
+        coord_text = "\n".join(lines)
+        
+        # Call LLM
+        prompt = f'''
+Here is the text of a PDF page with Y-coordinates [Y0, Y1] for each text block:
+{coord_text}
+
+Here is the content of a table/diagram we need to find on this page:
+{block_content[:1000]}
+
+Find the exact y0 (start) and y1 (end) coordinates of this table on the page.
+Output ONLY valid JSON in this format: {{"y0": float, "y1": float}}
+'''
+        # Use ai_parser client
+        from app.services.ai_parser import ai_parser
+        response = ai_parser.client.chat.completions.create(
+            model="gemini-1.5-flash",
+            messages=[
+                {"role": "system", "content": "You are a precise table bounding box locator. Output ONLY JSON."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.0,
+            response_format={"type": "json_object"}
+        )
+        res_json = json.loads(response.choices[0].message.content)
+        y0 = float(res_json.get("y0", 0))
+        y1 = float(res_json.get("y1", 0))
+        
+        if y1 > y0 > 0:
+            rect = fitz.Rect(0, y0 - 15, page.rect.width, y1 + 15)
+            pix = page.get_pixmap(clip=rect, dpi=150)
+            file_obj = BytesIO(pix.tobytes("jpeg"))
+            from app.services.storage_service import storage
+            object_name = storage.upload_file(file_obj, f"llm_crop_{page_num_hint}_{y0}.jpg", content_type="image/jpeg", folder="exams/diagrams")
+            return storage.get_presigned_url(object_name, expiration=7*24*3600)
+    except Exception as e:
+        logger.error(f"Lỗi khi dùng LLM cắt ảnh bảng biểu: {e}")
+    return None
 
 # Giá trị form UI không trùng hoàn toàn với enum ExamType trong database.
 EXAM_TYPE_MAP = {
@@ -260,21 +330,183 @@ def process_exam_upload_task(self, job_id: int, class_id: int, title: str, subje
             if not document_text or len(document_text.strip()) < 50:
                 raise ValueError("Không thể trích xuất văn bản từ file hoặc file quá ngắn.")
 
+            # Giai đoạn 0: Kiểm kê trang (chỉ dành cho PDF)
+            if mime_type == "application/pdf":
+                notification.publish_job_status(job_id, "processing", 42, "Đang trích xuất văn bản và hình ảnh inline...")
+            
             # 6. Pass 2: Bóc tách từng câu hỏi qua AI
             notification.publish_job_status(job_id, "processing", 60, "AI đang bóc tách từng câu hỏi và gán nhãn...")
             
-            # Tự động nhận diện môn học thực sự (đặc biệt cho Self-Practice)
             real_subject = subject
-            if subject in ["Self-Practice", "Khác"]:
-                try:
-                    logger.info("Đang tự động nhận diện môn học thực tế...")
-                    classification = ai_parser.classify_document(document_text)
-                    real_subject = classification.subject
-                    logger.info(f"Môn học được nhận diện: {real_subject}")
-                except Exception as e:
-                    logger.warning(f"Lỗi khi nhận diện môn học, fallback về {subject}: {e}")
+            # Theo yêu cầu của user: Phụ thuộc 100% vào loại mà user chọn trên UI.
+            # Nếu user KHÔNG chọn IELTS, nhưng Regex/Heuristic nhận diện đây là đề IELTS -> Báo lỗi ngay lập tức.
+            if subject.upper() != "IELTS":
+                if "IELTS" in document_text[:1000].upper() or "IELTS" in title.upper():
+                    raise Exception("Lỗi: Môn học bạn chọn trên hệ thống không khớp với nội dung file. Hệ thống nhận diện đây là đề thi IELTS, vui lòng chọn môn học/dạng đề là IELTS để đảm bảo bóc tách chuẩn 3 Passages.")
 
-            parsed_exam = ai_parser.extract_questions(document_text, subject=real_subject)
+            master_questions = []
+            passage_parents_data = [] # Data để tạo parent question
+
+            if real_subject == "IELTS":
+                # NHÁNH ĐẶC TRỊ IELTS: 1 Request duy nhất lấy toàn bộ cấu trúc
+                notification.publish_job_status(job_id, "processing", 50, "AI đang đọc và bóc tách toàn bộ 3 bài đọc IELTS (1 Request)...")
+                parsed_exam_ielts = ai_parser.extract_ielts_full_document(document_text)
+                
+                # Validation 1: Đúng 3 Passages
+                if len(parsed_exam_ielts.passages) != 3:
+                    raise Exception(f"Lỗi Bóc Tách: Đề thi IELTS bắt buộc phải nhận diện đúng 3 Bài Đọc (Passages). Hệ thống nhận diện ra {len(parsed_exam_ielts.passages)} đoạn. Vui lòng kiểm tra lại cấu trúc file PDF.")
+                
+                for passage_idx, passage in enumerate(parsed_exam_ielts.passages):
+                    # Frontend expects tabs to be named "Passage 1", "Passage 2", etc.
+                    p_tab_title = f"Passage {passage_idx + 1}"
+                    p_content = f"**{passage.title}**\n\n{passage.content}" if passage.title else passage.content
+                    p_ref_val = p_content
+                    
+                    passage_parents_data.append({
+                        "p_ref": p_ref_val,
+                        "title": p_tab_title
+                    })
+
+                    for block in passage.blocks:
+                        q_count = (block.range_end - block.range_start + 1) if block.range_end and block.range_start else len(block.questions)
+                        
+                        img_url = getattr(block, 'image_url', None)
+                        
+                        is_grouped = block.range_start is not None and block.range_end is not None and block.range_start != block.range_end
+                        groupable_types = ["table_completion", "summary_completion", "diagram_label_completion", "sentence_completion"]
+                        
+                        if is_grouped and block.type in groupable_types:
+                            instruction = block.instruction if block.instruction else ""
+                            b_content = block.block_content if block.block_content else ""
+                            range_text = f"**Questions {block.range_start}-{block.range_end}**" if block.range_start else ""
+                            
+                            # LLM-Assisted Table Cropping
+                            if not img_url and block.type in ["table_completion", "diagram_label_completion", "matching_features"]:
+                                img_url = crop_table_via_llm(local_file_path, b_content)
+                            
+                            # Visual Override: Nếu có ảnh và là dạng bảng/sơ đồ, bỏ qua OCR text
+                            if img_url and block.type in ["table_completion", "diagram_label_completion", "matching_features"]:
+                                blanks = "\n".join([f"[blank_{i}]" for i in range(1, q_count + 1)])
+                                q_text = f"{range_text}\n\n{instruction}\n\n{blanks}"
+                            else:
+                                # Tránh bị đúp ô trống: chỉ thêm [blank] nếu trong text KHÔNG CÓ sẵn ___
+                                if "___" not in b_content and "[blank" not in b_content:
+                                    blanks = "\n".join([f"[blank_{i}]" for i in range(1, q_count + 1)])
+                                    q_text = f"{range_text}\n\n{instruction}\n\n{b_content}\n\n{blanks}"
+                                else:
+                                    q_text = f"{range_text}\n\n{instruction}\n\n{b_content}"
+                            
+                            answers = [getattr(q, 'correct_answer', '') for q in block.questions]
+                            import json
+                            merged_answers = json.dumps(answers, ensure_ascii=False) if any(answers) else ""
+
+                            parent_q = QuestionSchema(
+                                id=block.block_id,
+                                block_id=block.block_id,
+                                type=block.type,
+                                question_text=q_text,
+                                options=[],
+                                correct_answer=merged_answers,
+                                image_url=img_url,
+                                passage_ref=p_ref_val,
+                                part_title=p_tab_title,
+                                is_block_parent=True,
+                                original_question_number=block.range_start
+                            )
+                            master_questions.append(parent_q)
+                            
+                            # TẠO CÁC CÂU HỎI CON VÀ TRỎ VỀ CHA
+                            children_generated = 0
+                            for idx, q in enumerate(block.questions):
+                                # Kiểm tra Anchor ID chống câu hỏi rác
+                                orig_num = getattr(q, 'original_question_number', None)
+                                if orig_num is not None and block.range_start is not None and block.range_end is not None:
+                                    if orig_num < block.range_start or orig_num > block.range_end:
+                                        logger.warning(f"Drop câu rác do ảo giác: {orig_num} không nằm trong {block.range_start}-{block.range_end}")
+                                        continue
+
+                                child_q = QuestionSchema(
+                                    id=q.id if getattr(q, 'id', None) else f"{block.block_id}_{idx}",
+                                    original_question_number=orig_num,
+                                    block_id=block.block_id,
+                                    type=getattr(q, 'type', None) or block.type,
+                                    question_text=q.question_text,
+                                    options=getattr(q, 'options', []),
+                                    correct_answer=getattr(q, 'correct_answer', ""),
+                                    image_url=None, 
+                                    passage_ref=p_ref_val,
+                                    part_title=p_tab_title,
+                                    parent_block_id=block.block_id
+                                )
+                                master_questions.append(child_q)
+                                children_generated += 1
+                                
+                            # Fallback Auto-Recovery: Nếu LLM quên hoặc bị drop hết, tự sinh đủ câu
+                            if children_generated == 0 and block.range_start and block.range_end:
+                                for orig_num in range(block.range_start, block.range_end + 1):
+                                    child_q = QuestionSchema(
+                                        id=f"{block.block_id}_fallback_{orig_num}",
+                                        original_question_number=orig_num,
+                                        block_id=block.block_id,
+                                        type="fill_in_the_blank",
+                                        question_text=f"Question {orig_num}",
+                                        options=[],
+                                        correct_answer="",
+                                        image_url=None,
+                                        passage_ref=p_ref_val,
+                                        part_title=p_tab_title,
+                                        parent_block_id=block.block_id
+                                    )
+                                    master_questions.append(child_q)
+
+                        else:
+                            # Tạo các câu hỏi độc lập (hoặc block chứa 1 câu)
+                            for idx, q in enumerate(block.questions):
+                                orig_num = getattr(q, 'original_question_number', None)
+                                if orig_num is not None and block.range_start is not None and block.range_end is not None:
+                                    if orig_num < block.range_start or orig_num > block.range_end:
+                                        logger.warning(f"Drop câu rác do ảo giác: {orig_num} không nằm trong {block.range_start}-{block.range_end}")
+                                        continue
+
+                                final_type = getattr(q, 'type', None) or block.type
+                                final_options = getattr(q, 'options', [])
+                                
+                                # Xử lý UX cho True/False/Not Given
+                                if final_type == "true_false_not_given" and not final_options:
+                                    q_text_lower = (q.question_text or "").lower()
+                                    if "yes" in q_text_lower or "no" in q_text_lower:
+                                        final_options = ["Yes", "No", "Not Given"]
+                                    else:
+                                        final_options = ["True", "False", "Not Given"]
+
+                                q_schema = QuestionSchema(
+                                    id=q.id if getattr(q, 'id', None) else f"{block.block_id}_{idx}",
+                                    original_question_number=orig_num,
+                                    block_id=block.block_id,
+                                    type=final_type,
+                                    question_text=q.question_text,
+                                    options=final_options,
+                                    correct_answer=getattr(q, 'correct_answer', ""),
+                                    image_url=img_url if idx == 0 else None,
+                                    passage_ref=p_ref_val,
+                                    part_title=p_tab_title
+                                )
+                                master_questions.append(q_schema)
+
+                # Đếm tổng số câu hỏi thực tế sau khi tạo cấu trúc (chỉ đếm câu hỏi con/độc lập, bỏ qua parent block)
+                total_parsed = 0
+                for q in master_questions:
+                    if not getattr(q, "is_block_parent", False):
+                        total_parsed += 1
+
+                # Validation 2: Số câu hỏi ~40
+                if not (38 <= total_parsed <= 42):
+                    raise Exception(f"Lỗi Bóc Tách: Đề thi IELTS chuẩn phải có khoảng 40 câu hỏi. Hệ thống hiện tại nhận diện được {total_parsed} câu. Vui lòng kiểm tra lại các đánh số câu hỏi trong file PDF.")
+            
+            else:
+                # Báo lỗi vì các file "vibe code" hỗ trợ nhánh này đã bị xoá theo yêu cầu
+                raise NotImplementedError("Tính năng bóc tách cho các môn không phải IELTS tạm thời bị vô hiệu hoá vì file block_detector và passage_segmenter đã bị xoá.")
+
 
             # 7. Lưu dữ liệu vào Database
             notification.publish_job_status(job_id, "processing", 90, "Đang lưu cấu trúc bài thi vào Database...")
@@ -288,7 +520,7 @@ def process_exam_upload_task(self, job_id: int, class_id: int, title: str, subje
                 new_exam = Exam(
                     class_id=class_id,
                     title=title,
-                    subject=subject,
+                    subject=real_subject, # Đã sửa thành real_subject
                     exam_type=normalized_exam_type,
                     duration=duration,
                     result_visibility="full",
@@ -297,7 +529,62 @@ def process_exam_upload_task(self, job_id: int, class_id: int, title: str, subje
                 db.add(new_exam)
                 db.flush() 
 
-                for q_data in parsed_exam.questions:
+                # Tạo Parent Questions cho các đoạn Passage để tiết kiệm bộ nhớ (Lỗi D)
+                passage_db_map = {}
+                for p_data in passage_parents_data:
+                    p_ref = p_data["p_ref"]
+                    if p_ref not in passage_db_map:
+                        parent_q = Question(
+                            exam_id=new_exam.id,
+                            component_type="reading_passage",
+                            question_text=p_data["title"],
+                            passage_ref=p_ref
+                        )
+                        db.add(parent_q)
+                        db.flush()
+                        passage_db_map[p_ref] = parent_q.id
+
+                # Tầng 2: Insert các Block Parents
+                block_db_map = {}
+                for q_data in master_questions:
+                    if getattr(q_data, "is_block_parent", False):
+                        db_type = q_data.type
+                        if db_type == "latex_formula":
+                            db_type = "math_equation"
+                        elif db_type == "writing":
+                            db_type = "essay"
+                        elif db_type == "fill_blank":
+                            db_type = "fill_in_the_blank"
+
+                        parent_id = None
+                        final_passage_ref = getattr(q_data, "passage_ref", None)
+                        if final_passage_ref in passage_db_map:
+                            parent_id = passage_db_map[final_passage_ref]
+                            final_passage_ref = None
+
+                        new_block_q = Question(
+                            exam_id=new_exam.id,
+                            parent_id=parent_id,
+                            component_type=db_type,
+                            question_text=q_data.question_text,
+                            options=q_data.options if q_data.options else [],
+                            correct_answer=q_data.correct_answer,
+                            score_weight=getattr(q_data, "score_weight", 1.0),
+                            passage_ref=final_passage_ref,
+                            answer_placeholder=getattr(q_data, "answer_placeholder", None),
+                            image_url=getattr(q_data, "image_url", None),
+                            original_question_number=getattr(q_data, "original_question_number", None)
+                        )
+                        db.add(new_block_q)
+                        db.flush()
+                        if q_data.block_id:
+                            block_db_map[q_data.block_id] = new_block_q.id
+
+                # Tầng 3: Insert các câu hỏi con (Sub-questions) và câu hỏi độc lập
+                for q_data in master_questions:
+                    if getattr(q_data, "is_block_parent", False):
+                        continue # Đã insert ở trên
+
                     db_type = q_data.type
                     if db_type == "latex_formula":
                         db_type = "math_equation"
@@ -306,22 +593,30 @@ def process_exam_upload_task(self, job_id: int, class_id: int, title: str, subje
                     elif db_type == "fill_blank":
                         db_type = "fill_in_the_blank"
 
-                    p_ref = q_data.passage_ref
-                    p_title = getattr(q_data, "part_title", None)
-                    if p_title and p_ref and not p_ref.startswith(f"[{p_title}]"):
-                        p_ref = f"[{p_title}]\n\n{p_ref}"
-                    elif p_title and not p_ref:
-                        p_ref = f"[{p_title}]"
+                    parent_id = None
+                    final_passage_ref = getattr(q_data, "passage_ref", None)
+                    
+                    # Nếu là câu hỏi con của một block, trỏ parent_id về block đó
+                    if getattr(q_data, "parent_block_id", None) and q_data.parent_block_id in block_db_map:
+                        parent_id = block_db_map[q_data.parent_block_id]
+                        final_passage_ref = None
+                    # Nếu là câu độc lập, trỏ về passage
+                    elif final_passage_ref in passage_db_map:
+                        parent_id = passage_db_map[final_passage_ref]
+                        final_passage_ref = None
 
                     new_question = Question(
                         exam_id=new_exam.id,
+                        parent_id=parent_id,
                         component_type=db_type,
                         question_text=q_data.question_text,
                         options=q_data.options if q_data.options else [],
                         correct_answer=q_data.correct_answer,
-                        score_weight=q_data.score_weight,
-                        passage_ref=p_ref,
+                        score_weight=getattr(q_data, "score_weight", 1.0),
+                        passage_ref=final_passage_ref,
                         answer_placeholder=getattr(q_data, "answer_placeholder", None),
+                        image_url=getattr(q_data, "image_url", None),
+                        original_question_number=getattr(q_data, "original_question_number", None)
                     )
                     db.add(new_question)
 

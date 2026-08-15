@@ -64,11 +64,7 @@ function NewExamContent() {
       formData.append("subject", subject);
 
       // Call teacher upload endpoint
-      const { data } = await apiClient.post("/exams/upload", formData, {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
-      });
+      const { data } = await apiClient.post("/exams/upload", formData);
 
       setJobId(data.job_id);
     } catch (e: any) {
@@ -164,6 +160,7 @@ function NewExamContent() {
                   disabled={loading}
                 >
                   <option value="" disabled>-- Chọn môn học --</option>
+                  <option value="IELTS">IELTS</option>
                   <option value="Toán Học">Toán Học</option>
                   <option value="Vật Lý">Vật Lý</option>
                   <option value="Hóa Học">Hóa Học</option>

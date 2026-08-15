@@ -9,23 +9,26 @@ import Link from "next/link";
 
 export default function PracticeUploadPage() {
   const router = useRouter();
+  const [subject, setSubject] = useState("");
   const [jobId, setJobId] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleFileSelect = async (file: File) => {
+    if (!subject) {
+      setError("Vui lòng chọn môn học/loại đề trước khi tải tệp lên.");
+      return;
+    }
+    
     setLoading(true);
     setError(null);
     try {
       const formData = new FormData();
       formData.append("file", file);
+      formData.append("subject", subject);
 
       // Call student quick upload endpoint
-      const { data } = await apiClient.post("/practice/upload-quick", formData, {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
-      });
+      const { data } = await apiClient.post("/practice/upload-quick", formData);
 
       setJobId(data.job_id);
     } catch (e: any) {
@@ -70,7 +73,29 @@ export default function PracticeUploadPage() {
         )}
 
         {!jobId ? (
-          <FileDropzone onFileSelect={handleFileSelect} disabled={loading} />
+          <div className="space-y-6">
+            <div className="bg-white/40 p-5 border border-slate-200 rounded-xl">
+              <label className="block text-sm font-medium text-slate-600 mb-2">Loại đề / Môn học</label>
+              <select
+                value={subject}
+                onChange={(e) => setSubject(e.target.value)}
+                className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                disabled={loading}
+              >
+                <option value="" disabled>-- Chọn loại đề --</option>
+                <option value="IELTS">IELTS (Có chia màn hình Reading)</option>
+                <option value="Toán Học">Toán Học (Làm bài tập trung)</option>
+                <option value="Vật Lý">Vật Lý</option>
+                <option value="Hóa Học">Hóa Học</option>
+                <option value="Tiếng Anh">Tiếng Anh (THPT Quốc Gia)</option>
+                <option value="Self-Practice">Khác (Tự động nhận diện)</option>
+              </select>
+            </div>
+            
+            <div className={!subject ? "opacity-50 pointer-events-none" : ""}>
+              <FileDropzone onFileSelect={handleFileSelect} disabled={loading || !subject} />
+            </div>
+          </div>
         ) : (
           <AIProcessingStatus
             jobId={jobId}

@@ -17,7 +17,7 @@ interface QuestionRendererProps {
     answer_placeholder?: string;
     [key: string]: any;
   };
-  questionNumber?: number;
+  questionNumber?: number | string;
   selectedAnswer?: any;
   onChange: (answer: any) => void;
   disabled?: boolean;
@@ -115,6 +115,18 @@ export const QuestionRenderer: React.FC<QuestionRendererProps> = ({
           )}
         </div>
       )}
+      
+      {/* Hiển thị Hình ảnh / Biểu đồ (nếu có) */}
+      {question.image_url && (
+        <div className="mb-6 flex justify-center">
+          <img 
+            src={question.image_url} 
+            alt={`Hình minh họa cho câu ${questionNumber || ''}`}
+            className="w-full max-w-3xl rounded-lg shadow-sm border border-slate-200/60 object-contain"
+          />
+        </div>
+      )}
+
       {renderQuestionComponent()}
     </div>
   );

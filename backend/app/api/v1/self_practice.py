@@ -1,5 +1,5 @@
 import os
-from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, status
+from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException, status
 from sqlalchemy.orm import Session
 
 # Import Database Dependencies
@@ -74,6 +74,7 @@ def _get_or_create_personal_workspace(db: Session, student: User) -> int:
 @router.post("/upload-quick", response_model=AIJobCreateResponse, status_code=status.HTTP_202_ACCEPTED)
 def upload_self_practice_exam(
     file: UploadFile = File(...),
+    subject: str = Form("Self-Practice"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user) # Chấp nhận cả role 'student'
 ):
@@ -95,6 +96,7 @@ def upload_self_practice_exam(
         object_key = storage.upload_file(
             file_obj=file.file, 
             original_filename=file.filename,
+            content_type=file.content_type,
             folder=f"self_practice/{current_user.id}"
         )
 
@@ -115,7 +117,7 @@ def upload_self_practice_exam(
             job_id=new_job.id, 
             class_id=personal_class_id,
             title=f"Đề tự luyện - {title_without_ext}",
-            subject="Self-Practice",
+            subject=subject,
             duration=60,
             test_type="practice"
         )

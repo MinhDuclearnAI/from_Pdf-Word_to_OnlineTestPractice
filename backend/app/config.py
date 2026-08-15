@@ -15,7 +15,13 @@ class Settings(BaseSettings):
     @field_validator("BACKEND_CORS_ORIGINS", mode="before")
     @classmethod
     def assemble_cors_origins(cls, v: Any) -> Any:
-        if isinstance(v, str) and not v.startswith("["):
+        if isinstance(v, str):
+            if v.startswith("["):
+                import json
+                try:
+                    return json.loads(v)
+                except Exception:
+                    pass
             return [i.strip() for i in v.split(",")]
         return v
 
@@ -43,12 +49,12 @@ class Settings(BaseSettings):
         if isinstance(v, str) and v.strip():
             return v
         
-        # Lấy các giá trị đã được Pydantic parse trước đó
-        values = info.data
+        # Lấy các giá trị (Pydantic v2 support ValidationInfo but we aren't using it in signature)
+        # We can fallback to env vars directly
         return (
-            f"postgresql://{values.get('POSTGRES_USER')}:{values.get('POSTGRES_PASSWORD')}"
-            f"@{values.get('POSTGRES_SERVER')}:{values.get('POSTGRES_PORT')}"
-            f"/{values.get('POSTGRES_DB')}"
+            f"postgresql://{os.getenv('POSTGRES_USER')}:{os.getenv('POSTGRES_PASSWORD')}"
+            f"@{os.getenv('POSTGRES_SERVER')}:{os.getenv('POSTGRES_PORT')}"
+            f"/{os.getenv('POSTGRES_DB')}"
         )
 
     # ==========================================

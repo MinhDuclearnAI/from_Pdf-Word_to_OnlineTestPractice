@@ -66,6 +66,26 @@ class QuestionSchema(BaseModel):
         None, 
         description="Gợi ý hiển thị trong ô nhập liệu (Placeholder) đối với câu tự luận"
     )
+    image_url: Optional[str] = Field(
+        None,
+        description="Đường dẫn đến hình ảnh/biểu đồ nếu câu hỏi này có kèm hình ảnh"
+    )
+    block_id: Optional[str] = Field(
+        None,
+        description="ID của block chứa câu hỏi này (nếu gọi batched extraction)"
+    )
+    is_block_parent: bool = Field(
+        False,
+        description="Đánh dấu câu hỏi này là câu hỏi gốc đại diện cho 1 block (chứa các câu hỏi con)"
+    )
+    original_question_number: Optional[int] = Field(
+        None,
+        description="Số thứ tự câu hỏi gốc in trên đề bài (mỏ neo)"
+    )
+    parent_block_id: Optional[str] = Field(
+        None,
+        description="Trỏ về block_id của câu hỏi cha nếu đây là câu hỏi con"
+    )
 
     @model_validator(mode="before")
     @classmethod
@@ -187,9 +207,42 @@ class ExamExtractionSchema(BaseModel):
         return value
 
 
+class IELTSBlockSchema(BaseModel):
+    """Schema cho một block câu hỏi (có thể là câu đơn hoặc range câu hỏi)."""
+    block_id: str = Field(..., description="ID của block, ví dụ 'block_1'")
+    range_start: Optional[int] = Field(None, description="Số thứ tự câu bắt đầu (vd: 1)")
+    range_end: Optional[int] = Field(None, description="Số thứ tự câu kết thúc (vd: 5)")
+    type: ComponentType = Field(..., description="Loại UI Component của block này")
+    instruction: Optional[str] = Field(None, description="Câu lệnh hướng dẫn, vd: 'Choose NO MORE THAN TWO WORDS...'")
+    block_content: Optional[str] = Field(None, description="Nội dung văn bản của block (vd: Cấu trúc bảng, đoạn tóm tắt) CỰC KỲ QUAN TRỌNG cho các dạng điền từ.")
+    image_url: Optional[str] = Field(None, description="Trích xuất thẻ [[IMAGE_REF: ...]] từ Raw Text nếu có")
+    questions: List[QuestionSchema] = Field(
+        default_factory=list, 
+        description="Danh sách các câu hỏi cụ thể bên trong block này"
+    )
+
+class IELTSPassageSchema(BaseModel):
+    """Schema cho một Passage trong đề thi IELTS."""
+    passage_id: str = Field(..., description="ID của passage, ví dụ 'P1', 'P2', 'P3'")
+    title: Optional[str] = Field(None, description="Tiêu đề của bài đọc")
+    content: str = Field(..., description="Nội dung đầy đủ của bài đọc (loại bỏ các câu hỏi)")
+    blocks: List[IELTSBlockSchema] = Field(
+        default_factory=list,
+        description="Danh sách các block câu hỏi thuộc bài đọc này"
+    )
+
+class IELTSExamSchema(BaseModel):
+    """Schema bọc ngoài cùng cho kết quả bóc tách toàn bộ đề thi IELTS (1 request)."""
+    passages: List[IELTSPassageSchema] = Field(
+        ...,
+        description="Danh sách đúng 3 bài đọc của đề IELTS"
+    )
+
 # ==========================================
 # 2. Schemas cho CRUD API (Giao tiếp Frontend - Backend)
 # ==========================================
+
+from pydantic import BaseModel, Field, ConfigDict, model_validator, field_validator
 
 class QuestionBase(BaseModel):
     """
@@ -203,6 +256,14 @@ class QuestionBase(BaseModel):
     passage_ref: Optional[str] = None
     part_title: Optional[str] = None
     answer_placeholder: Optional[str] = None
+    image_url: Optional[str] = None
+    parent_id: Optional[int] = None
+    original_question_number: Optional[int] = None
+
+    @field_validator("options", mode="before")
+    @classmethod
+    def convert_none_to_list(cls, v):
+        return v if v is not None else []
 
 
 class QuestionCreate(QuestionBase):
@@ -224,6 +285,7 @@ class QuestionUpdate(BaseModel):
     passage_ref: Optional[str] = None
     part_title: Optional[str] = None
     answer_placeholder: Optional[str] = None
+    image_url: Optional[str] = None
 
 
 class QuestionOut(QuestionBase):

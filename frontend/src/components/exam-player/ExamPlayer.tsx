@@ -25,12 +25,13 @@ interface ExamPlayerProps {
     passage_ref?: string;
     part_title?: string;
     answer_placeholder?: string;
+    original_question_number?: number;
     [key: string]: any;
   }>;
   examId: string | string[];
 }
 
-export const ExamPlayer: React.FC<ExamPlayerProps> = ({ exam, questions, examId }) => {
+export const ExamPlayer: React.FC<ExamPlayerProps> = ({ exam, questions: rawQuestions, examId }) => {
   const router = useRouter();
   const {
     answers,
@@ -44,6 +45,27 @@ export const ExamPlayer: React.FC<ExamPlayerProps> = ({ exam, questions, examId 
     setIsSubmitting,
   } = useExamStore();
 
+  const questions = useMemo(() => {
+    // Helper to get effective question number for sorting
+    const getEffectiveNumber = (q: any) => {
+      if (q.original_question_number != null) return q.original_question_number;
+      // If it's a parent block, find the minimum question number of its children
+      const children = rawQuestions?.filter(c => c.parent_id === q.id) || [];
+      if (children.length > 0) {
+        const childNums = children.map(c => c.original_question_number).filter(n => n != null);
+        if (childNums.length > 0) return Math.min(...childNums);
+      }
+      return 9999;
+    };
+
+    return [...(rawQuestions || [])].sort((a, b) => {
+      const aNum = getEffectiveNumber(a);
+      const bNum = getEffectiveNumber(b);
+      if (aNum === bNum) return String(a.id).localeCompare(String(b.id));
+      return aNum - bNum;
+    });
+  }, [rawQuestions]);
+
   const { forceSave } = useExamDraft(exam.id);
   const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false);
   const [activePartIndex, setActivePartIndex] = useState<number>(0);
@@ -56,18 +78,70 @@ export const ExamPlayer: React.FC<ExamPlayerProps> = ({ exam, questions, examId 
   const passageGroups = useMemo(() => {
     if (!questions || questions.length === 0) return [];
 
-    // Chỉ kích hoạt chế độ Split Screen nếu có passage_ref thực sự dài (>= 40 ký tự) 
-    // hoặc môn học là IELTS và có chia phần. Tránh việc AI nhận nhầm tiêu đề thành passage.
-    const isIELTS = exam?.subject?.toUpperCase() === "IELTS";
-    const hasValidPassage = questions.some((q) => {
-      const pText = q.passage_ref?.trim() || "";
-      const isJustTitle = pText.startsWith("[") && pText.endsWith("]") && pText.length < 40;
-      return pText.length > 40 && !isJustTitle;
-    });
+    const subject = exam?.subject?.toUpperCase() || "";
+    const isIELTS = subject.includes("IELTS");
+    
+    if (!isIELTS) return [];
 
-    // Nếu không phải IELTS và không có bài đọc nào đủ dài, thì hiển thị chế độ 1 cột (Standard)
-    if (!hasValidPassage && !isIELTS) return [];
+    // Tìm đúng 3 passage (có component_type là reading_passage)
+    const passageParents = questions.filter(q => q.component_type === "reading_passage");
 
+    // Nếu backend trả về passageParents, ta dựa vào parent_id để tạo đúng số tab đó (thường là 3)
+    if (passageParents.length > 0) {
+      const groups = passageParents.map((p, idx) => ({
+        id: p.id,
+        title: p.question_text || `Passage ${idx + 1}`,
+        passageText: p.passage_ref || "",
+        questions: [] as Array<{ item: any; originalIndex: number }>,
+      }));
+
+      // Bước 1: Build map từ question_id -> passage_id gốc (để resolve các câu hỏi con của block)
+      const qToPassage = new Map();
+      questions.forEach(q => {
+        if (q.parent_id && passageParents.some(p => String(p.id) === String(q.parent_id))) {
+          qToPassage.set(String(q.id), String(q.parent_id));
+        }
+      });
+      // Lặp lần 2 để xử lý các câu cháu (thuộc block con)
+      questions.forEach(q => {
+        if (q.parent_id && qToPassage.has(String(q.parent_id))) {
+          qToPassage.set(String(q.id), qToPassage.get(String(q.parent_id)));
+        }
+      });
+
+      // Bước 2: Nhét các câu hỏi (KHÔNG phải reading_passage) vào đúng group
+      questions.forEach((q, idx) => {
+        if (q.component_type === "reading_passage") return; // Bỏ qua câu hỏi parent
+
+        const resolvedPassageId = qToPassage.get(String(q.id));
+        if (resolvedPassageId) {
+          const group = groups.find(g => String(g.id) === resolvedPassageId);
+          if (group) {
+            group.questions.push({ item: q, originalIndex: idx });
+          }
+        } else {
+          // Fallback: nếu câu hỏi bị mồ côi (không có parent_id do data cũ),
+          // fallback dựa vào string matching passage_ref
+          const pText = q.passage_ref?.trim() || "";
+          if (pText) {
+            const fallbackGroup = groups.find(g => g.passageText && g.passageText.includes(pText.substring(0, 50)));
+            if (fallbackGroup) {
+              fallbackGroup.questions.push({ item: q, originalIndex: idx });
+              return;
+            }
+          }
+          // Fallback cuối cùng: ném vào group cuối cùng
+          if (groups.length > 0) {
+            groups[groups.length - 1].questions.push({ item: q, originalIndex: idx });
+          }
+        }
+      });
+
+      return groups;
+    }
+
+    // Nếu không có passageParents (dữ liệu cũ không có tree structure),
+    // Fallback lại logic cũ nhưng ép cứng gom nhóm tốt hơn:
     const groups: Array<{
       title: string;
       passageText: string;
@@ -99,11 +173,11 @@ export const ExamPlayer: React.FC<ExamPlayerProps> = ({ exam, questions, examId 
         const lastGroup = groups[groups.length - 1];
         if (
           (cleanPassageText && lastGroup.passageText === cleanPassageText) ||
-          (!cleanPassageText && lastGroup.passageText && lastGroup.questions.length < 15) ||
           (extractedTitle && lastGroup.title === extractedTitle)
         ) {
           lastGroup.questions.push({ item: q, originalIndex: idx });
         } else {
+          // Chỉ tạo passage mới nếu nội dung passage thực sự khác biệt
           groups.push({
             title: extractedTitle || `Passage ${groups.length + 1}`,
             passageText: cleanPassageText,
@@ -114,7 +188,7 @@ export const ExamPlayer: React.FC<ExamPlayerProps> = ({ exam, questions, examId 
     });
 
     return groups;
-  }, [questions]);
+  }, [questions, exam]);
 
   if (!questions || questions.length === 0) {
     return (
@@ -123,6 +197,51 @@ export const ExamPlayer: React.FC<ExamPlayerProps> = ({ exam, questions, examId 
       </div>
     );
   }
+
+  // Lọc ra các câu hỏi thực sự có thể trả lời (bỏ qua passage và block parent)
+  const isParentSet = useMemo(() => {
+    const isParent = new Set<string>();
+    questions.forEach(q => {
+      if (q.parent_id) isParent.add(String(q.parent_id));
+    });
+    return isParent;
+  }, [questions]);
+
+  const isBlockParent = (id: string | number) => {
+    return isParentSet.has(String(id)) && questions.find(q => String(q.id) === String(id))?.component_type !== "reading_passage";
+  };
+
+  const isChildOfBlock = (id: string | number) => {
+    const q = questions.find(x => String(x.id) === String(id));
+    return q?.parent_id ? isBlockParent(q.parent_id) : false;
+  };
+
+  const actualQuestions = useMemo(() => {
+    let displayNum = 1;
+    return questions
+      .map((q, idx) => ({ ...q, originalIndex: idx }))
+      .filter(q => q.component_type !== "reading_passage" && !isBlockParent(q.id))
+      .map(q => {
+         const num = q.original_question_number || displayNum;
+         if (!q.original_question_number) displayNum++;
+         return { ...q, displayNumber: num };
+      });
+  }, [questions, isParentSet]);
+
+  const getQuestionAnswer = (q: any) => {
+    let ans = answers[String(q.id)];
+    if ((ans === undefined || ans === null || ans === "") && q.parent_id) {
+       if (isBlockParent(q.parent_id)) {
+          const children = actualQuestions.filter(child => String(child.parent_id) === String(q.parent_id)).sort((a,b) => (a.id > b.id ? 1 : -1));
+          const childIdx = children.findIndex(c => String(c.id) === String(q.id));
+          if (childIdx !== -1) {
+             const parentAns = answers[String(q.parent_id)];
+             if (Array.isArray(parentAns)) ans = parentAns[childIdx];
+          }
+       }
+    }
+    return ans;
+  };
 
   const handleNext = () => {
     if (currentIndex < questions.length - 1) {
@@ -141,26 +260,35 @@ export const ExamPlayer: React.FC<ExamPlayerProps> = ({ exam, questions, examId 
   };
 
   const calculateAnsweredCount = (groupQuestions?: Array<{item: any}>) => {
-    const targetQuestions = groupQuestions ? groupQuestions.map(g => g.item) : questions;
+    const targetQuestions = groupQuestions 
+      ? actualQuestions.filter(aq => groupQuestions.some(gq => gq.item.id === aq.id || aq.parent_id === gq.item.id))
+      : actualQuestions;
     return targetQuestions.filter(q => {
-      const ans = answers[String(q.id)];
+      const ans = getQuestionAnswer(q);
       return ans !== undefined && ans !== null && ans !== "";
     }).length;
   };
 
   const scrollToQuestion = (index: number) => {
+    let targetIndex = index;
+    const targetQ = questions[index];
+    if (targetQ && targetQ.parent_id && isBlockParent(targetQ.parent_id)) {
+       const parentIdx = questions.findIndex(p => String(p.id) === String(targetQ.parent_id));
+       if (parentIdx !== -1) targetIndex = parentIdx;
+    }
+
     setCurrentIndex(index);
     if (passageGroups.length > 1) {
       const partIdx = passageGroups.findIndex((g) =>
-        g.questions.some((qObj) => qObj.originalIndex === index)
+        g.questions.some((qObj) => qObj.originalIndex === index || qObj.originalIndex === targetIndex)
       );
       if (partIdx !== -1 && partIdx !== activePartIndex) {
         setActivePartIndex(partIdx);
       }
     }
     setTimeout(() => {
-      const targetQId = String(questions[index].id);
-      const el = document.getElementById(`question-card-${targetQId}`) || document.getElementById(`question-card-${index}`);
+      const targetQId = String(questions[targetIndex].id);
+      const el = document.getElementById(`question-card-${targetQId}`) || document.getElementById(`question-card-${targetIndex}`);
       if (el) {
         el.scrollIntoView({ behavior: "smooth", block: "start" });
       }
@@ -172,9 +300,24 @@ export const ExamPlayer: React.FC<ExamPlayerProps> = ({ exam, questions, examId 
     setIsSubmitModalOpen(false);
     try {
       await forceSave();
+
+      // Transform answers: Unpack block parent arrays into child answers
+      const finalAnswers = { ...answers };
+      questions.forEach(q => {
+        if (isBlockParent(q.id)) {
+           const children = actualQuestions.filter(child => String(child.parent_id) === String(q.id)).sort((a,b) => (a.id > b.id ? 1 : -1));
+           const parentAns = finalAnswers[String(q.id)];
+           if (Array.isArray(parentAns)) {
+              children.forEach((child, idx) => {
+                 finalAnswers[String(child.id)] = parentAns[idx] || "";
+              });
+           }
+        }
+      });
+
       const { data } = await apiClient.post("/submissions/", {
         exam_id: exam.id,
-        answers,
+        answers: finalAnswers,
       });
       router.push(`/result/${data.id}`);
     } catch (e) {
@@ -237,32 +380,58 @@ export const ExamPlayer: React.FC<ExamPlayerProps> = ({ exam, questions, examId 
             title={activeGroup.title}
             passageText={activeGroup.passageText}
           >
-            {activeGroup.questions.map(({ item, originalIndex }) => (
-              <QuestionRenderer
-                key={item.id}
-                question={item}
-                questionNumber={originalIndex + 1}
-                selectedAnswer={answers[String(item.id)]}
-                onChange={(ans) => handleAnswerChange(item.id, ans)}
-                disabled={isSubmitting}
-                isStandalonePassage={true}
-              />
-            ))}
+            {activeGroup.questions.filter(({item}) => !isChildOfBlock(item.id)).map(({ item, originalIndex }) => {
+              let qNumDisplay: string | number = originalIndex + 1;
+              if (isBlockParent(item.id)) {
+                  const children = actualQuestions.filter(child => String(child.parent_id) === String(item.id)).sort((a,b) => (a.id > b.id ? 1 : -1));
+                  if (children.length > 0) {
+                     qNumDisplay = children.length === 1 ? children[0].displayNumber : `${children[0].displayNumber} - ${children[children.length - 1].displayNumber}`;
+                  }
+              } else {
+                  const aq = actualQuestions.find(aq => String(aq.id) === String(item.id));
+                  if (aq) qNumDisplay = aq.displayNumber;
+              }
+
+              return (
+                <QuestionRenderer
+                  key={item.id}
+                  question={item}
+                  questionNumber={qNumDisplay}
+                  selectedAnswer={answers[String(item.id)]}
+                  onChange={(ans) => handleAnswerChange(item.id, ans)}
+                  disabled={isSubmitting}
+                  isStandalonePassage={true}
+                />
+              );
+            })}
           </ReadingSplitScreen>
         ) : (
           // STANDARD SCREEN (MATH, PHYSICS, ETC)
           <div className="h-full w-full overflow-y-auto p-4 md:p-8">
             <div className="max-w-3xl mx-auto space-y-6 pb-32">
-              {questions.map((q, idx) => (
-                <QuestionRenderer
-                  key={q.id}
-                  question={q}
-                  questionNumber={idx + 1}
-                  selectedAnswer={answers[String(q.id)]}
-                  onChange={(ans) => handleAnswerChange(q.id, ans)}
-                  disabled={isSubmitting}
-                />
-              ))}
+              {questions.map((q, idx) => ({item: q, originalIndex: idx})).filter(({item}) => !isChildOfBlock(item.id) && item.component_type !== "reading_passage").map(({ item, originalIndex }) => {
+                let qNumDisplay: string | number = originalIndex + 1;
+                if (isBlockParent(item.id)) {
+                    const children = actualQuestions.filter(child => String(child.parent_id) === String(item.id)).sort((a,b) => (a.id > b.id ? 1 : -1));
+                    if (children.length > 0) {
+                       qNumDisplay = children.length === 1 ? children[0].displayNumber : `${children[0].displayNumber} - ${children[children.length - 1].displayNumber}`;
+                    }
+                } else {
+                    const aq = actualQuestions.find(aq => String(aq.id) === String(item.id));
+                    if (aq) qNumDisplay = aq.displayNumber;
+                }
+
+                return (
+                  <QuestionRenderer
+                    key={item.id}
+                    question={item}
+                    questionNumber={qNumDisplay}
+                    selectedAnswer={answers[String(item.id)]}
+                    onChange={(ans) => handleAnswerChange(item.id, ans)}
+                    disabled={isSubmitting}
+                  />
+                );
+              })}
             </div>
           </div>
         )}
@@ -277,21 +446,21 @@ export const ExamPlayer: React.FC<ExamPlayerProps> = ({ exam, questions, examId 
                </div>
                
                <div className="grid grid-cols-5 sm:grid-cols-8 md:grid-cols-10 lg:grid-cols-12 gap-3">
-                 {questions.map((q, idx) => {
+                 {actualQuestions.map((q, qIndex) => {
                    const isAns = answers[String(q.id)] !== undefined && answers[String(q.id)] !== null && answers[String(q.id)] !== "";
-                   const isFlag = flaggedQuestions[idx];
+                   const isFlag = flaggedQuestions[q.originalIndex];
                    return (
                      <button
                         key={q.id}
                         onClick={() => {
                           setShowGrid(false);
-                          scrollToQuestion(idx);
+                          scrollToQuestion(q.originalIndex);
                         }}
                         className={`relative flex items-center justify-center h-12 w-full rounded-xl text-sm font-bold transition-all border ${
                           isAns ? "bg-brand-50 border-brand-500/50 text-brand-700 shadow-sm" : "bg-white border-slate-200 text-slate-500 hover"
                         }`}
                      >
-                        {idx + 1}
+                        {qIndex + 1}
                         {isFlag && <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-orange-500 shadow-sm border-2 border-white" />}
                      </button>
                    )
@@ -305,14 +474,18 @@ export const ExamPlayer: React.FC<ExamPlayerProps> = ({ exam, questions, examId 
       {/* 3. HORIZONTAL NAVIGATOR FOR ALL EXAMS */}
       {!showGrid && (
         <div className="w-full bg-slate-50 border-t border-slate-200 px-4 py-2 flex items-center justify-center gap-1.5 sm:gap-2 overflow-x-auto shadow-inner z-20">
-          {(isIELTSReadingFormat && activeGroup ? activeGroup.questions : questions.map((item, idx) => ({ item, originalIndex: idx }))).map(({ item, originalIndex }) => {
-            const qId = String(item.id);
+          {(isIELTSReadingFormat && activeGroup ? actualQuestions.filter(aq => activeGroup.questions.some(gq => gq.item.id === aq.id)) : actualQuestions).map((q, qIndex) => {
+            const qId = String(q.id);
             const isAns = answers[qId] !== undefined && answers[qId] !== null && answers[qId] !== "";
-            const isCurrent = currentIndex === originalIndex;
+            // Trong IELTS Navigator, ta đánh dấu current dựa trên việc câu hỏi đó có thuộc block đang xem hay không
+            // Nhưng hiện tại UI scroll đến item block parent, nên currentIndex có thể là index của block parent.
+            // Nên so sánh currentIndex với q.originalIndex hoặc parent của nó.
+            const isCurrent = currentIndex === q.originalIndex || (q.parent_id && questions[currentIndex]?.id === q.parent_id);
+            
             return (
               <button
                 key={qId}
-                onClick={() => scrollToQuestion(originalIndex)}
+                onClick={() => scrollToQuestion(q.originalIndex)}
                 className={`flex items-center justify-center min-w-[36px] h-9 rounded-lg text-sm transition-all border flex-shrink-0 ${
                   isCurrent && isAns
                     ? "bg-brand-700 text-white border-brand-700 font-bold shadow-md transform scale-110 z-10"
@@ -323,7 +496,7 @@ export const ExamPlayer: React.FC<ExamPlayerProps> = ({ exam, questions, examId 
                     : "bg-white border-slate-200 text-slate-500 font-medium hover:bg-slate-100"
                 }`}
               >
-                {originalIndex + 1}
+                {q.displayNumber}
               </button>
             );
           })}
@@ -350,7 +523,7 @@ export const ExamPlayer: React.FC<ExamPlayerProps> = ({ exam, questions, examId 
             {passageGroups.map((group, pIdx) => {
               const isActive = activePartIndex === pIdx;
               const answered = calculateAnsweredCount(group.questions);
-              const total = group.questions.length;
+              const total = actualQuestions.filter(aq => group.questions.some(gq => gq.item.id === aq.id || aq.parent_id === gq.item.id)).length;
               return (
                 <button
                   key={pIdx}
@@ -375,7 +548,13 @@ export const ExamPlayer: React.FC<ExamPlayerProps> = ({ exam, questions, examId 
         <div className="flex items-center gap-2 md:gap-3">
            {isIELTSReadingFormat && activeGroup ? (
              <div className="hidden sm:flex items-center text-sm font-semibold text-slate-500 mr-2">
-               Câu {activeGroup.questions[0].originalIndex + 1} - {activeGroup.questions[activeGroup.questions.length - 1].originalIndex + 1}
+               Câu {
+                 (() => {
+                   const groupActuals = actualQuestions.filter(aq => activeGroup.questions.some(gq => gq.item.id === aq.id || aq.parent_id === gq.item.id));
+                   if (groupActuals.length === 0) return "-";
+                   return `${groupActuals[0].displayNumber} - ${groupActuals[groupActuals.length - 1].displayNumber}`;
+                 })()
+               }
              </div>
            ) : null}
            

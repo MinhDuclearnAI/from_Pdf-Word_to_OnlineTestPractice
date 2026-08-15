@@ -1,5 +1,6 @@
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, status
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
@@ -74,6 +75,31 @@ async def app_exception_handler(request: Request, exc: BaseAppException):
             "error": True,
             "message": exc.message,
             "type": exc.__class__.__name__
+        }
+    )
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    """
+    Bắt lỗi validation của FastAPI (thường do thiếu tham số hoặc định dạng sai)
+    và chuẩn hóa lại cấu trúc JSON cho Frontend dễ xử lý.
+    """
+    errors = exc.errors()
+    import sys
+    print("VALIDATION ERROR DETAIL:", errors)
+    sys.stdout.flush()
+    # Lấy thông điệp lỗi của phần tử đầu tiên hoặc gộp lại
+    error_msg = errors[0].get("msg") if errors else "Dữ liệu không hợp lệ."
+    if "Field required" in error_msg or "field required" in error_msg.lower():
+        error_msg = "Thiếu thông tin bắt buộc."
+        
+    return JSONResponse(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        content={
+            "error": True,
+            "message": f"Lỗi tham số: {error_msg}",
+            "type": "ValidationError",
+            "details": str(errors) # Cast to string to prevent bytes serialization error
         }
     )
 

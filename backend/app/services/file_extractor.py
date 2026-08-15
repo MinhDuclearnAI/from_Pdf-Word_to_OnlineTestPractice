@@ -10,6 +10,17 @@ class FileParsingError(Exception):
     """Custom exception khi không thể đọc hoặc parse file."""
     pass
 
+BOLD_MARKER_START = "[[BOLD_START]]"
+BOLD_MARKER_END = "[[BOLD_END]]"
+
+def strip_structure_markers(text: str) -> str:
+    """Loại bỏ các marker cấu trúc khỏi text trước khi lưu hoặc hiển thị."""
+    if not text:
+        return ""
+    text = text.replace(BOLD_MARKER_START, "")
+    text = text.replace(BOLD_MARKER_END, "")
+    return text
+
 def clean_and_normalize_text(raw_text: str) -> str:
     """
     Sử dụng spaCy để làm sạch các ký tự Unicode rác, chuẩn hóa khoảng trắng,
@@ -37,19 +48,40 @@ def extract_text_from_pdf(file_path: str) -> Tuple[str, bool]:
     is_scanned = True  # Giả định ban đầu là file scan
 
     try:
+        from app.services.storage_service import storage
+        from io import BytesIO
         doc = fitz.open(file_path)
+        img_counter = 1
+        
         for page_num in range(len(doc)):
             page = doc.load_page(page_num)
             
             # Sử dụng sort=True để PyMuPDF tự động phán đoán thứ tự đọc (Reading Order)
-            # Rất hữu ích với các đề thi chia 2 cột
-            page_text = page.get_text("text", sort=True)
-            
-            if page_text.strip():
-                is_scanned = False  # Nếu trích xuất được text, đây là text-based PDF
-                text_content.append(page_text)
-            
-            # Có thể chèn thêm logic trích xuất bảng (tables) của PyMuPDF nếu cần thiết tại đây
+            blocks = page.get_text("blocks", sort=True)
+            for b in blocks:
+                if b[6] == 0: # Text block
+                    page_text = b[4]
+                    if page_text.strip():
+                        is_scanned = False
+                        text_content.append(page_text)
+                elif b[6] == 1: # Image block
+                    try:
+                        rect = fitz.Rect(b[0], b[1], b[2], b[3])
+                        # Kiểm tra kích thước rect để tránh crop ảnh quá nhỏ (như icon/bullet)
+                        if rect.width > 50 and rect.height > 50:
+                            cropped_pix = page.get_pixmap(clip=rect, dpi=150)
+                            cropped_bytes = cropped_pix.tobytes("jpeg")
+                            
+                            file_obj = BytesIO(cropped_bytes)
+                            original_name = f"inline_crop_p{page_num}_{img_counter}.jpg"
+                            object_name = storage.upload_file(file_obj, original_name, content_type="image/jpeg", folder="exams/diagrams")
+                            image_url = storage.get_presigned_url(object_name, expiration=7*24*3600)
+                            
+                            if image_url:
+                                text_content.append(f"\n[[IMAGE_REF: {image_url}]]\n")
+                            img_counter += 1
+                    except Exception as img_err:
+                        logger.error(f"Lỗi crop ảnh inline trang {page_num}: {img_err}")
 
         doc.close()
         
@@ -61,6 +93,102 @@ def extract_text_from_pdf(file_path: str) -> Tuple[str, bool]:
     except Exception as e:
         logger.error(f"Lỗi khi đọc file PDF {file_path}: {str(e)}")
         raise FileParsingError(f"Không thể trích xuất PDF: {str(e)}")
+
+import base64
+from io import BytesIO
+
+def inventory_page(file_path: str) -> list:
+    """
+    Kiểm kê từng trang PDF: có ảnh nhúng không, có vùng vẽ vector không, độ dài text.
+    """
+    inventory = []
+    try:
+        doc = fitz.open(file_path)
+        for page_num in range(len(doc)):
+            page = doc.load_page(page_num)
+            images = page.get_images()
+            drawings = page.get_drawings()
+            text = page.get_text("text")
+            
+            image_rects = []
+            for img_info in images:
+                xref = img_info[0]
+                rects = page.get_image_rects(xref)
+                for rect in rects:
+                    image_rects.append({
+                        "x0": rect.x0, "y0": rect.y0, "x1": rect.x1, "y1": rect.y1
+                    })
+            
+            drawing_rects = []
+            for d in drawings:
+                rect = d["rect"]
+                drawing_rects.append({
+                    "x0": rect.x0, "y0": rect.y0, "x1": rect.x1, "y1": rect.y1
+                })
+            
+            inventory.append({
+                "page": page_num,
+                "has_image": len(images) > 0,
+                "has_vector": len(drawings) > 0,
+                "text_len": len(text.strip()),
+                "image_rects": image_rects,
+                "drawing_rects": [] # Bỏ qua vector drawings vì PyMuPDF lấy cả các đường kẻ viền bảng, sinh ra rác
+            })
+        doc.close()
+    except Exception as e:
+        logger.error(f"Lỗi khi kiểm kê PDF {file_path}: {e}")
+    return inventory
+
+def process_image_blocks(file_path: str, image_blocks: list) -> list:
+    """
+    (Deprecated) Dùng extract_all_images_from_inventory thay thế.
+    """
+    pass
+
+def extract_all_images_from_inventory(file_path: str, inventory: list) -> list:
+    """
+    Tự động crop tất cả ảnh từ inventory (tránh mất ảnh), upload và trả về list URL.
+    """
+    assets_found = []
+    try:
+        from app.services.storage_service import storage
+        doc = fitz.open(file_path)
+        
+        img_counter = 1
+        for page_data in inventory:
+            page_num = page_data.get("page", 0)
+            rects = page_data.get("image_rects", []) + page_data.get("drawing_rects", [])
+            
+            if not rects:
+                continue
+                
+            page = doc.load_page(page_num)
+            for rect_dict in rects:
+                rect = fitz.Rect(rect_dict["x0"], rect_dict["y0"], rect_dict["x1"], rect_dict["y1"])
+                try:
+                    cropped_pix = page.get_pixmap(clip=rect, dpi=150)
+                    cropped_bytes = cropped_pix.tobytes("jpeg")
+                    
+                    file_obj = BytesIO(cropped_bytes)
+                    original_name = f"auto_crop_p{page_num}_{img_counter}.jpg"
+                    object_name = storage.upload_file(file_obj, original_name, content_type="image/jpeg", folder="exams/diagrams")
+                    
+                    image_url = storage.get_presigned_url(object_name, expiration=7*24*3600)
+                    
+                    if image_url:
+                        assets_found.append({
+                            "page": page_num,
+                            "image_url": image_url
+                        })
+                    img_counter += 1
+                except Exception as crop_err:
+                    logger.error(f"Lỗi khi crop ảnh tại trang {page_num}: {crop_err}")
+                    
+        doc.close()
+    except Exception as e:
+        logger.error(f"Lỗi khi trích xuất toàn bộ ảnh từ {file_path}: {e}")
+        
+    return assets_found
 
 def extract_text_from_docx(file_path: str) -> str:
     """

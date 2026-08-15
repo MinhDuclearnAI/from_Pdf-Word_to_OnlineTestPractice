@@ -59,6 +59,12 @@ class Question(Base):
     # [FIX]: Bổ sung 2 cột bị thiếu để Celery Task không bị crash lỗi AttributeError
     passage_ref = Column(Text, nullable=True)
     answer_placeholder = Column(String, nullable=True)
+    
+    # [FIX]: Ảnh vector/biểu đồ được cắt từ PDF (Tầng 0)
+    image_url = Column(String, nullable=True)
+
+    # [FIX]: Mỏ neo số thứ tự câu hỏi gốc in trên đề bài
+    original_question_number = Column(Integer, nullable=True)
 
     # ==========================================
     # SELF-REFERENTIAL RELATIONSHIP (Đệ quy)

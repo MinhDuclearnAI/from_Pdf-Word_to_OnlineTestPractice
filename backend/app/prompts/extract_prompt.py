@@ -1,78 +1,67 @@
 import re
 
-# System Prompt thiết lập ranh giới cứng cho LLM, buộc nó phải hành xử như một Data Extractor.
 EXTRACT_SYSTEM_PROMPT = """
-Bạn là một chuyên gia AI cao cấp về xử lý dữ liệu giáo dục và bóc tách cấu trúc đề thi.
-Nhiệm vụ của bạn là đọc toàn bộ nội dung văn bản thô của đề thi và bóc tách ĐẦY ĐỦ 100% tất cả các câu hỏi vào một cấu trúc JSON hợp lệ và nghiêm ngặt.
+Bạn là một chuyên gia AI cao cấp về phân tích dữ liệu giáo dục.
+Nhiệm vụ của bạn là nhận vào một tập hợp các "Blocks" câu hỏi của đề thi và trích xuất cấu trúc câu hỏi thành mảng JSON.
+Các Blocks được phân tách rõ ràng bằng các đường viền ===================.
 
-QUY TẮC BẮT BUỘC:
-1. BẠN CHỈ ĐƯỢC PHÉP TRẢ VỀ ĐÚNG MỘT KHỐI JSON HỢP LỆ (bắt đầu bằng { và kết thúc bằng }).
-2. Tuyệt đối KHÔNG giải thích, KHÔNG thêm lời mở đầu hay kết thúc ngoài JSON.
-3. ĐẢM BẢO BÓC TÁCH ĐẦY ĐỦ TẤT CẢ CÁC CÂU HỎI CÓ TRONG ĐỀ (Ví dụ đề có 40 câu thì phải bóc tách đủ 40 câu, không được dừng giữa chừng).
-4. Giữ nguyên định dạng công thức toán, lý, hóa dưới dạng ký hiệu LaTeX chuẩn ($...$ hoặc $$...$$).
-5. ĐỐI VỚI ĐỀ ĐỌC HIỂU (IELTS, TOEFL, Đọc hiểu Tiếng Anh / Ngữ Văn):
-   - Trích xuất toàn bộ bài đọc (Reading Passage) vào trường "passage_text" của phần hoặc "passage_ref" của câu hỏi.
-   - Giữ nguyên toàn bộ nội dung bài đọc, không được tóm tắt hay cắt bớt.
+QUY TẮC VÀNG (BẮT BUỘC):
+1. BẠN CHỈ ĐƯỢC PHÉP TRẢ VỀ ĐÚNG MỘT KHỐI JSON HỢP LỆ.
+2. KHÔNG BAO GIỜ TỰ Ý CHÉP LẠI (REPRODUCE) NỘI DUNG NÀO KHÁC BÊN NGOÀI BLOCK. Bạn CHỈ được phép dùng nội dung văn bản CÓ SẴN BÊN TRONG chính Block được cung cấp.
+3. Trích xuất ĐẦY ĐỦ TẤT CẢ các câu hỏi có trong TẤT CẢ các Blocks. KHÔNG ĐƯỢC BỎ SÓT.
 """
 
-# User Prompt chứa định nghĩa Schema chi tiết hỗ trợ cả dạng phẳng và dạng Section/Passage
 EXTRACT_USER_PROMPT_TEMPLATE = """
-Dưới đây là nội dung đề thi (hoặc một phần của đề thi):
+Dưới đây là danh sách các Block chứa câu hỏi của đề thi. Bài đọc dài (Reading Passage) ĐÃ BỊ LƯỢC BỎ để bạn tập trung vào câu hỏi.
 
---- BẮT ĐẦU NỘI DUNG ---
-{document_text}
---- KẾT THÚC NỘI DUNG ---
+--- BẮT ĐẦU DANH SÁCH BLOCK ---
+{batched_blocks_content}
+--- KẾT THÚC DANH SÁCH BLOCK ---
 
-Hãy bóc tách TẤT CẢ các câu hỏi có trong tài liệu trên thành JSON chuẩn.
+Hãy trích xuất TẤT CẢ các câu hỏi trong tất cả các block trên thành JSON.
 
 QUY TẮC CẤU TRÚC JSON:
-1. Nếu đề có chia theo Bài đọc / Phần (ví dụ: READING PASSAGE 1, PASSAGE 2, PART 1, PHẦN 1...):
-   Hãy trả về theo cấu trúc "sections":
-{{
-    "sections": [
-        {{
-            "section_title": "Tên bài đọc / Phần (ví dụ: 'READING PASSAGE 1' hoặc 'Đọc hiểu 1')",
-            "passage_text": "Toàn bộ nội dung bài đọc văn bản dài của phần này. Tuyệt đối không cắt bớt.",
-            "questions": [
-                {{
-                    "id": "q1",
-                    "type": "Phân loại: 'multiple_choice' (trắc nghiệm), 'fill_in_the_blank' (điền từ), 'essay' (tự luận/trả lời ngắn), hoặc 'math_equation' (toán/công thức)",
-                    "question_text": "Nội dung câu hỏi đầy đủ",
-                    "options": ["A. Lựa chọn 1", "B. Lựa chọn 2", "C. Lựa chọn 3", "D. Lựa chọn 4"],
-                    "correct_answer": "Đáp án đúng nếu có trong đề (ví dụ 'A', 'True', 'False', 'Not Given'), nếu không có thì null",
-                    "score_weight": 1.0,
-                    "answer_placeholder": null
-                }}
-            ]
-        }}
-    ]
-}}
-
-2. Nếu đề là các câu hỏi thông thường (Toán, Lý, Hóa, Sử, Địa...) hoặc không có bài đọc dài:
-   Bạn có thể trả về cấu trúc "questions":
+1. Bạn PHẢI trả về theo định dạng:
 {{
     "questions": [
-        {{
-            "id": "q1",
-            "type": "multiple_choice | math_equation | fill_in_the_blank | essay",
-            "question_text": "Nội dung đầy đủ của câu hỏi",
-            "options": ["A. Lựa chọn 1", "B. Lựa chọn 2", "C. Lựa chọn 3", "D. Lựa chọn 4"],
-            "correct_answer": "Đáp án đúng nếu có, hoặc null",
-            "score_weight": 1.0,
-            "part_title": null,
-            "passage_ref": null,
-            "answer_placeholder": null
-        }}
+        // Danh sách toàn bộ câu hỏi của tất cả các block
     ]
 }}
 
-LƯU Ý: Phải trích xuất ĐẦY ĐỦ TẤT CẢ các câu hỏi từ đầu đến cuối mà không bỏ sót bất kỳ câu nào!
+2. Đối với MỖI câu hỏi, BẮT BUỘC phải có:
+- Trường `id`: Một ID ngẫu nhiên hoặc số thứ tự, ví dụ: "q1", "q14". BẮT BUỘC CÓ.
+- Trường `block_id`: SAO CHÉP CHÍNH XÁC ID TỪ BLOCK ĐƯỢC CUNG CẤP (Ví dụ: "block_1"). NẾU BỎ QUÊN TRƯỜNG NÀY, HỆ THỐNG SẼ LỖI TOÀN BỘ. BẮT BUỘC CÓ.
+
+3. Đối với trường `type`, BẠN CHỈ ĐƯỢC PHÉP CHỌN 1 TRONG CÁC GIÁ TRỊ SAU:
+- "multiple_choice" (Trắc nghiệm thường)
+- "fill_in_the_blank" (Điền khuyết, câu trả lời ngắn)
+- "true_false_not_given" (True/False/Not Given, Yes/No/Not Given)
+- "matching_headings" (Nối tiêu đề)
+- "matching_features" (Nối đặc điểm)
+- "sentence_completion" (Hoàn thành câu)
+- "summary_completion" (Hoàn thành đoạn tóm tắt)
+- "table_completion" (Hoàn thành bảng)
+- "diagram_label_completion" (Điền nhãn biểu đồ, lưu đồ)
+- "multiple_choice_ielts" (Trắc nghiệm IELTS nhiều đáp án)
+TUYỆT ĐỐI KHÔNG dùng các type khác như 'short_answer', 'flow_chart_completion', v.v. Nếu gặp 'short_answer', dùng 'fill_in_the_blank'. Nếu gặp 'flow_chart_completion', dùng 'diagram_label_completion' hoặc 'summary_completion'.
+
+4. Đối với dạng bài ĐIỀN KHUYẾT (Table/Summary/Sentence/Diagram Completion):
+- NẾU GỘP NHIỀU CÂU HỎI THÀNH 1 (Ví dụ: Từ câu 1 đến câu 5 thuộc cùng 1 bảng): BẮT BUỘC phải tạo ra ĐÚNG 5 chỗ trống `[blank_1]`, `[blank_2]`, `[blank_3]`, `[blank_4]`, `[blank_5]` bên trong `question_text` tương ứng với số lượng đáp án cần điền.
+- Nếu không gộp, hãy tách thành từng đối tượng câu hỏi riêng biệt, mỗi câu chứa đúng 1 chỗ trống `[blank_1]`.
+- COPY CHÍNH XÁC TỪNG CHỮ CÓ TRONG BLOCK GỐC. TUYỆT ĐỐI KHÔNG TỰ SÁNG TẠO/THÊM BỚT TỪ.
+
+5. Đối với MCQ, True/False/Not Given, Matching:
+- NGHIÊM CẤM gộp các câu hỏi độc lập lại thành dạng điền khuyết.
+- Kể cả khi chúng nằm trong cụm "Questions 1-5", BẮT BUỘC phải tách rời chúng ra thành 5 object câu hỏi riêng biệt trong mảng `questions` để UI hiển thị dạng khoanh trắc nghiệm. Không dùng thẻ `[blank]`.
+
+6. Hình ảnh / Biểu đồ (Diagram Label Completion):
+- Nếu Block Text có nhắc đến một hình ảnh (hoặc nếu bạn được truyền kèm context THÔNG TIN HÌNH ẢNH khớp với nội dung câu), hãy sử dụng `type`: "diagram_label_completion" và CHẮC CHẮN chèn URL của hình ảnh đó vào trường `image_url`.
 """
 
-def get_extraction_prompt(document_text: str) -> str:
+def get_extraction_prompt(batched_blocks_content: str) -> str:
     """
-    Hàm tiện ích để chuẩn bị prompt bóc tách đề thi.
-    Thực hiện tiền xử lý text thô để giúp LLM nhận diện cấu trúc tốt hơn.
+    Chuẩn bị prompt chứa danh sách các blocks.
     """
-    cleaned_text = re.sub(r'\n{3,}', '\n\n', document_text).strip()
-    return EXTRACT_USER_PROMPT_TEMPLATE.format(document_text=cleaned_text)
+    return EXTRACT_USER_PROMPT_TEMPLATE.format(
+        batched_blocks_content=batched_blocks_content.strip()
+    )

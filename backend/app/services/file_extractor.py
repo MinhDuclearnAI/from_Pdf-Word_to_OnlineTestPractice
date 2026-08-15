@@ -2,7 +2,8 @@ import os
 import logging
 import fitz  # PyMuPDF
 import docx
-from typing import Optional, Tuple
+from typing import Tuple
+from io import BytesIO
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +50,6 @@ def extract_text_from_pdf(file_path: str) -> Tuple[str, bool]:
 
     try:
         from app.services.storage_service import storage
-        from io import BytesIO
         doc = fitz.open(file_path)
         img_counter = 1
         
@@ -93,9 +93,6 @@ def extract_text_from_pdf(file_path: str) -> Tuple[str, bool]:
     except Exception as e:
         logger.error(f"Lỗi khi đọc file PDF {file_path}: {str(e)}")
         raise FileParsingError(f"Không thể trích xuất PDF: {str(e)}")
-
-import base64
-from io import BytesIO
 
 def inventory_page(file_path: str) -> list:
     """

@@ -26,6 +26,7 @@ interface ExamPlayerProps {
     part_title?: string;
     answer_placeholder?: string;
     original_question_number?: number;
+    parent_id?: string | number | null;
     [key: string]: any;
   }>;
   examId: string | string[];

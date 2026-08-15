@@ -50,11 +50,28 @@ def extract_text_from_pdf(file_path: str) -> Tuple[str, bool]:
 
     try:
         from app.services.storage_service import storage
+        
+        # 1. Chạy pipeline inventory để tìm và crop ảnh chuẩn xác nhất (kể cả ảnh lẩn trong text)
+        inventory = inventory_page(file_path)
+        assets = extract_all_images_from_inventory(file_path, inventory)
+        
+        # Nhóm assets theo page
+        page_assets = {}
+        for asset in assets:
+            p = asset["page"]
+            if p not in page_assets:
+                page_assets[p] = []
+            page_assets[p].append(asset["image_url"])
+
         doc = fitz.open(file_path)
-        img_counter = 1
         
         for page_num in range(len(doc)):
             page = doc.load_page(page_num)
+            
+            # Chèn thẻ IMAGE_REF của trang này vào trước nội dung text của trang
+            if page_num in page_assets:
+                for img_url in page_assets[page_num]:
+                    text_content.append(f"\n[[IMAGE_REF: {img_url}]]\n")
             
             # Sử dụng sort=True để PyMuPDF tự động phán đoán thứ tự đọc (Reading Order)
             blocks = page.get_text("blocks", sort=True)
@@ -64,24 +81,7 @@ def extract_text_from_pdf(file_path: str) -> Tuple[str, bool]:
                     if page_text.strip():
                         is_scanned = False
                         text_content.append(page_text)
-                elif b[6] == 1: # Image block
-                    try:
-                        rect = fitz.Rect(b[0], b[1], b[2], b[3])
-                        # Kiểm tra kích thước rect để tránh crop ảnh quá nhỏ (như icon/bullet)
-                        if rect.width > 50 and rect.height > 50:
-                            cropped_pix = page.get_pixmap(clip=rect, dpi=150)
-                            cropped_bytes = cropped_pix.tobytes("jpeg")
-                            
-                            file_obj = BytesIO(cropped_bytes)
-                            original_name = f"inline_crop_p{page_num}_{img_counter}.jpg"
-                            object_name = storage.upload_file(file_obj, original_name, content_type="image/jpeg", folder="exams/diagrams")
-                            image_url = storage.get_presigned_url(object_name, expiration=7*24*3600)
-                            
-                            if image_url:
-                                text_content.append(f"\n[[IMAGE_REF: {image_url}]]\n")
-                            img_counter += 1
-                    except Exception as img_err:
-                        logger.error(f"Lỗi crop ảnh inline trang {page_num}: {img_err}")
+                # Bỏ qua b[6] == 1 (Image block) ở đây vì đã xử lý qua inventory_page ở trên
 
         doc.close()
         

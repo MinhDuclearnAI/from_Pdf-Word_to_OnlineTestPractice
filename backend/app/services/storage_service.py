@@ -102,6 +102,11 @@ class StorageService:
                 Params={'Bucket': self.bucket_name, 'Key': object_name},
                 ExpiresIn=expiration
             )
+            # WORKAROUND DOCKER: Đảm bảo Frontend chạy trên máy host (localhost:3000)
+            # có thể phân giải được domain của MinIO (đang chạy trong docker name là minio:9000)
+            if "http://minio:9000" in response:
+                response = response.replace("http://minio:9000", "http://localhost:9000")
+                
             return response
         except ClientError as e:
             logger.error(f"Lỗi khi tạo presigned URL cho {object_name}: {e}")

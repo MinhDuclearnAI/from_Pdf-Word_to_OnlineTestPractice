@@ -208,7 +208,7 @@ from app.services.ai_parser import ai_parser
 
 logger = logging.getLogger(__name__)
 
-def crop_table_via_llm(pdf_path: str, block_content: str) -> str:
+def crop_table_via_llm(pdf_path: str, block_content: str, instruction: str = "") -> str:
     """Helper function to find table bounds using LLM and crop it."""
     try:
         if not block_content or len(block_content.strip()) < 10:
@@ -216,12 +216,15 @@ def crop_table_via_llm(pdf_path: str, block_content: str) -> str:
             
         doc = fitz.open(pdf_path)
         page_num_hint = -1
-        # Search for first 3 valid words to find the page
-        words = [w for w in block_content.replace("|", " ").replace("-", " ").split() if len(w) > 4]
+        
+        search_text = instruction if (instruction and len(instruction) > 10) else block_content
+        words = [w for w in search_text.replace("|", " ").replace("-", " ").split() if len(w) > 4]
+        
         if len(words) >= 2:
             for p_num in range(len(doc)):
                 text = doc.load_page(p_num).get_text()
-                if words[0] in text and words[1] in text:
+                matches = sum(1 for w in words[:5] if w in text)
+                if matches >= 2:
                     page_num_hint = p_num
                     break
         
@@ -243,16 +246,16 @@ def crop_table_via_llm(pdf_path: str, block_content: str) -> str:
 Here is the text of a PDF page with Y-coordinates [Y0, Y1] for each text block:
 {coord_text}
 
-Here is the content of a table/diagram we need to find on this page:
+Here is the content of a table/diagram/flowchart we need to find on this page:
 {block_content[:1000]}
 
-Find the exact y0 (start) and y1 (end) coordinates of this table on the page.
+Find the exact y0 (start) and y1 (end) coordinates of this table/diagram on the page.
 Output ONLY valid JSON in this format: {{"y0": float, "y1": float}}
 '''
         # Use ai_parser client
         from app.services.ai_parser import ai_parser
         response = ai_parser.client.chat.completions.create(
-            model="gemini-1.5-flash",
+            model="gemini-1.5-pro",
             messages=[
                 {"role": "system", "content": "You are a precise table bounding box locator. Output ONLY JSON."},
                 {"role": "user", "content": prompt}
@@ -382,7 +385,7 @@ def process_exam_upload_task(self, job_id: int, class_id: int, title: str, subje
                             
                             # LLM-Assisted Table Cropping
                             if not img_url and block.type in ["table_completion", "diagram_label_completion", "matching_features"]:
-                                img_url = crop_table_via_llm(local_file_path, b_content)
+                                img_url = crop_table_via_llm(local_file_path, b_content, instruction)
                             
                             # Visual Override: Nếu có ảnh và là dạng bảng/sơ đồ, bỏ qua OCR text
                             if block.type in groupable_types:

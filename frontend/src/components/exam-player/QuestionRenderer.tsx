@@ -22,6 +22,9 @@ interface QuestionRendererProps {
   onChange: (answer: any) => void;
   disabled?: boolean;
   isStandalonePassage?: boolean; // Nếu true, không tự động bọc ReadingSplitScreen (vì container cha đã bọc)
+  childQuestions?: any[];
+  childAnswers?: Record<string, any>;
+  onChildAnswerChange?: (childId: string | number, answer: any) => void;
 }
 
 export const QuestionRenderer: React.FC<QuestionRendererProps> = ({
@@ -31,6 +34,9 @@ export const QuestionRenderer: React.FC<QuestionRendererProps> = ({
   onChange,
   disabled,
   isStandalonePassage = false,
+  childQuestions,
+  childAnswers,
+  onChildAnswerChange,
 }) => {
   const renderQuestionComponent = () => {
     const qText = question.question_text || "";
@@ -127,7 +133,45 @@ export const QuestionRenderer: React.FC<QuestionRendererProps> = ({
         </div>
       )}
 
-      {renderQuestionComponent()}
+      {childQuestions && childQuestions.length > 0 ? (
+        <div className="mt-2">
+          {/* Render Parent Instruction/Content */}
+          {question.component_type !== "table_completion" && question.component_type !== "summary_completion" && question.component_type !== "diagram_label_completion" && question.component_type !== "sentence_completion" && (
+             <div className="text-base font-medium text-slate-800 mb-4 whitespace-pre-wrap leading-relaxed">
+               {question.question_text}
+             </div>
+          )}
+
+          {/* Render Children or Grouped Input */}
+          {(question.component_type === "table_completion" || question.component_type === "summary_completion" || question.component_type === "diagram_label_completion" || question.component_type === "sentence_completion") ? (
+             <FillBlankInput
+               questionId={question.id}
+               questionText={question.question_text || ""}
+               selectedAnswer={selectedAnswer}
+               onChange={onChange}
+               disabled={disabled}
+               childQuestions={childQuestions}
+               childAnswers={childAnswers}
+               onChildAnswerChange={onChildAnswerChange}
+             />
+          ) : (
+             <div className="space-y-4 pt-4 border-t border-slate-100">
+               {childQuestions.map((child) => (
+                 <QuestionRenderer
+                   key={child.id}
+                   question={child}
+                   questionNumber={child.displayNumber || child.original_question_number}
+                   selectedAnswer={childAnswers?.[String(child.id)]}
+                   onChange={(ans) => onChildAnswerChange && onChildAnswerChange(child.id, ans)}
+                   disabled={disabled}
+                 />
+               ))}
+             </div>
+          )}
+        </div>
+      ) : (
+        renderQuestionComponent()
+      )}
     </div>
   );
 };

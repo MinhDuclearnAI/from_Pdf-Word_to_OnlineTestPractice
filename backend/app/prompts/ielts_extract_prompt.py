@@ -12,6 +12,7 @@ QUY TẮC VÀNG (BẮT BUỘC):
 4. [MỚI] TUYỆT ĐỐI KHÔNG RÚT GỌN, TÓM TẮT, hay thay bằng placeholder kiểu "..." / "[nội dung đầy đủ]"
    cho BẤT KỲ nội dung nào bên trong block — kể cả khi bảng dài, danh sách heading nhiều mục,
    hay đoạn tóm tắt dài. Copy nguyên văn từng ký tự.
+5. VỀ HÌNH ẢNH: TUYỆT ĐỐI KHÔNG ĐƯỢC sinh ra bảng markdown ảo nếu có thẻ hình ảnh. NẾU VÀ CHỈ NẾU block chứa thẻ [[IMAGE_REF: <url>]], PHẢI lấy URL gán vào `image_url` và ĐỂ TRỐNG `block_content` (không tự chuyển đổi ảnh thành bảng chữ).
 """
 
 IELTS_EXTRACT_USER_PROMPT_TEMPLATE = """
@@ -53,7 +54,7 @@ QUY TẮC CẤU TRÚC JSON (CHUYÊN BIỆT CHO IELTS):
   Nếu block không có `image_ref` nào được cung cấp, để null — KHÔNG suy luận có ảnh dựa trên nội dung câu hỏi.
 
 3. Chọn đúng `type` (CHỈ được chọn 1 trong các giá trị sau, không tự tạo giá trị mới):
-- "true_false_not_given" (True/False/Not Given, Yes/No/Not Given)
+- "true_false_not_given" (True/False/Not Given, Yes/No/Not Given) -> PHẢI tự sinh mảng `options` là ["True", "False", "Not Given"] hoặc ["Yes", "No", "Not Given"] dựa vào câu lệnh instruction.
 - "multiple_choice" (Trắc nghiệm 1 đáp án đúng)
 - "multiple_choice_ielts" (Trắc nghiệm chọn nhiều đáp án)
 - "matching_headings" (Nối tiêu đề)
@@ -124,8 +125,8 @@ CẤU TRÚC JSON PHẢI TUÂN THỦ:
           "range_start": 1, // Số thứ tự câu bắt đầu của block (Ví dụ câu 1)
           "range_end": 5, // Số thứ tự câu kết thúc của block (Ví dụ câu 5). Nếu là câu đơn độc lập, range_start = range_end
           "type": "...", // CHỈ CHỌN 1: true_false_not_given, multiple_choice, multiple_choice_ielts, matching_headings, matching_features, sentence_completion, summary_completion, table_completion, diagram_label_completion, fill_in_the_blank
-          "instruction": "Câu lệnh hướng dẫn, vd: Choose NO MORE THAN TWO WORDS...",
-          "block_content": "Nội dung văn bản gốc CỦA BLOCK NÀY (Ví dụ: Cấu trúc Table dưới dạng Markdown, hoặc Đoạn văn Summary bị đục lỗ). RẤT QUAN TRỌNG ĐỐI VỚI DẠNG ĐIỀN TỪ, TUYỆT ĐỐI KHÔNG ĐƯỢC BỎ QUA. Nếu là Trắc nghiệm độc lập thì có thể để null.",
+          "instruction": "Câu lệnh hướng dẫn (vd: Choose NO MORE THAN TWO WORDS..., Do the following statements agree...). RẤT QUAN TRỌNG, BẮT BUỘC TRÍCH XUẤT NẾU CÓ.",
+          "block_content": "Nội dung văn bản gốc CỦA BLOCK NÀY (Ví dụ: Đoạn văn Summary bị đục lỗ). NẾU LÀ HÌNH ẢNH HOẶC BẢNG DẠNG ẢNH CÓ [[IMAGE_REF: ...]], BẮT BUỘC ĐỂ TRỐNG (null), tuyệt đối không tự bịa ra markdown table thay cho ảnh.",
           "image_url": "...", // NẾU VÀ CHỈ NẾU trong Raw Text của Block này (hoặc ngay trước nó) có thẻ [[IMAGE_REF: <url>]], bạn PHẢI trích xuất chính xác <url> đó vào đây. Nếu không có, để null.
           "questions": [
              {

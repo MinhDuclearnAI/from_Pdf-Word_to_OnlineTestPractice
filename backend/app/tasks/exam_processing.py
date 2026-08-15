@@ -375,26 +375,30 @@ def process_exam_upload_task(self, job_id: int, class_id: int, title: str, subje
                         is_grouped = block.range_start is not None and block.range_end is not None and block.range_start != block.range_end
                         groupable_types = ["table_completion", "summary_completion", "diagram_label_completion", "sentence_completion"]
                         
-                        if is_grouped and block.type in groupable_types:
+                        if is_grouped or block.instruction:
                             instruction = block.instruction if block.instruction else ""
                             b_content = block.block_content if block.block_content else ""
-                            range_text = f"**Questions {block.range_start}-{block.range_end}**" if block.range_start else ""
+                            range_text = f"**Questions {block.range_start}-{block.range_end}**" if block.range_start and block.range_end else ""
                             
                             # LLM-Assisted Table Cropping
                             if not img_url and block.type in ["table_completion", "diagram_label_completion", "matching_features"]:
                                 img_url = crop_table_via_llm(local_file_path, b_content)
                             
                             # Visual Override: Nếu có ảnh và là dạng bảng/sơ đồ, bỏ qua OCR text
-                            if img_url and block.type in ["table_completion", "diagram_label_completion", "matching_features"]:
-                                blanks = "\n".join([f"[blank_{i}]" for i in range(1, q_count + 1)])
-                                q_text = f"{range_text}\n\n{instruction}\n\n{blanks}"
-                            else:
-                                # Tránh bị đúp ô trống: chỉ thêm [blank] nếu trong text KHÔNG CÓ sẵn ___
-                                if "___" not in b_content and "[blank" not in b_content:
+                            if block.type in groupable_types:
+                                if img_url and block.type in ["table_completion", "diagram_label_completion", "matching_features"]:
                                     blanks = "\n".join([f"[blank_{i}]" for i in range(1, q_count + 1)])
-                                    q_text = f"{range_text}\n\n{instruction}\n\n{b_content}\n\n{blanks}"
+                                    q_text = f"{range_text}\n\n{instruction}\n\n{blanks}"
                                 else:
-                                    q_text = f"{range_text}\n\n{instruction}\n\n{b_content}"
+                                    # Tránh bị đúp ô trống: chỉ thêm [blank] nếu trong text KHÔNG CÓ sẵn ___
+                                    if "___" not in b_content and "[blank" not in b_content:
+                                        blanks = "\n".join([f"[blank_{i}]" for i in range(1, q_count + 1)])
+                                        q_text = f"{range_text}\n\n{instruction}\n\n{b_content}\n\n{blanks}"
+                                    else:
+                                        q_text = f"{range_text}\n\n{instruction}\n\n{b_content}"
+                            else:
+                                # Not groupable (e.g. TFNG) -> Just show instruction and b_content
+                                q_text = f"{range_text}\n\n{instruction}\n\n{b_content}".strip()
                             
                             answers = [getattr(q, 'correct_answer', '') for q in block.questions]
                             import json

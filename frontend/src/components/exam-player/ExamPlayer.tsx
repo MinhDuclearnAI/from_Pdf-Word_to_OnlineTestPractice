@@ -402,6 +402,9 @@ export const ExamPlayer: React.FC<ExamPlayerProps> = ({ exam, questions: rawQues
                   onChange={(ans) => handleAnswerChange(item.id, ans)}
                   disabled={isSubmitting}
                   isStandalonePassage={true}
+                  childQuestions={isBlockParent(item.id) ? actualQuestions.filter(child => String(child.parent_id) === String(item.id)).sort((a,b) => (a.id > b.id ? 1 : -1)) : undefined}
+                  childAnswers={answers}
+                  onChildAnswerChange={handleAnswerChange}
                 />
               );
             })}
@@ -430,6 +433,9 @@ export const ExamPlayer: React.FC<ExamPlayerProps> = ({ exam, questions: rawQues
                     selectedAnswer={answers[String(item.id)]}
                     onChange={(ans) => handleAnswerChange(item.id, ans)}
                     disabled={isSubmitting}
+                    childQuestions={isBlockParent(item.id) ? actualQuestions.filter(child => String(child.parent_id) === String(item.id)).sort((a,b) => (a.id > b.id ? 1 : -1)) : undefined}
+                    childAnswers={answers}
+                    onChildAnswerChange={handleAnswerChange}
                   />
                 );
               })}

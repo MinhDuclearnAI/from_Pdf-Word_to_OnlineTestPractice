@@ -158,6 +158,13 @@ class QuestionSchema(BaseModel):
             question_text = str(data.get("question_text", ""))
             data["type"] = "fill_in_the_blank" if "_" in question_text else "essay"
 
+        if data.get("type") == "true_false_not_given" and not data.get("options"):
+            q_text_lower = str(data.get("question_text", "")).lower()
+            if "yes" in q_text_lower or "no" in q_text_lower:
+                data["options"] = ["Yes", "No", "Not Given"]
+            else:
+                data["options"] = ["True", "False", "Not Given"]
+
         return data
 
 

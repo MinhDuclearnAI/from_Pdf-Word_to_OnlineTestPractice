@@ -15,7 +15,7 @@ ResultVisibilityType = Literal["hidden", "score_only", "full"]
 # ==========================================
 class ExamBase(BaseModel):
     title: str = Field(..., description="Tên bài kiểm tra/đề thi (Ví dụ: Thi thử giữa kỳ 1)")
-    subject: SubjectType = Field(..., description="Môn học của đề thi")
+    subject: Optional[str] = Field(None, description="Môn học của đề thi")
     test_type: TestType = Field(..., description="Phân loại: 'practice' (Luyện tập) hoặc 'exam' (Kiểm tra/Thi)")
     duration: int = Field(..., gt=0, description="Thời gian làm bài tính bằng phút")
     
@@ -25,7 +25,7 @@ class ExamBase(BaseModel):
     
     # Cấu hình xem kết quả (Chỉ hiện điểm / Hiện chi tiết / Công bố sau khi đóng)
     result_visibility: ResultVisibilityType = Field(
-        default="detailed", 
+        default="full", 
         description="Cấu hình quyền xem kết quả sau khi nộp bài"
     )
 
@@ -89,9 +89,10 @@ class ExamSummary(BaseModel):
     """
     id: int
     title: str
-    subject: SubjectType
+    subject: Optional[str] = None
     test_type: TestType
     duration: int
+    created_at: Optional[datetime] = None
     
     # Ở Frontend, ta thường cần biết trạng thái mở/đóng dựa vào thời gian hiện tại
     # Tuy nhiên trong DB không lưu trường is_active này, mà backend sẽ tính toán

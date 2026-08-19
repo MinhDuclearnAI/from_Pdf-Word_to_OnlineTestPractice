@@ -4,10 +4,12 @@ import useAuth from "@/hooks/useAuth";
 import apiClient from "@/lib/api-client";
 import SubjectList from "@/components/dashboard/SubjectList";
 import ExamCard from "@/components/dashboard/ExamCard";
+import StudentDashboard from "@/components/dashboard/StudentDashboard";
+import TeacherDashboard from "@/components/dashboard/TeacherDashboard";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import Modal from "@/components/ui/Modal";
-import { GraduationCap, LogOut, BookOpen, FileText, Plus, User as UserIcon, Mail, Calendar, MapPin, Briefcase } from "lucide-react";
+import { LogOut, Plus, User as UserIcon, Mail, Calendar, MapPin, Briefcase, Bell, Facebook, Instagram, GraduationCap, Search } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -23,7 +25,7 @@ interface ExamData {
   subject: string;
   test_type: string;
   duration: number;
-  created_at?: string; // ISO timestamp from backend — ngày giờ upload đề
+  created_at?: string;
 }
 
 export default function DashboardPage() {
@@ -32,6 +34,7 @@ export default function DashboardPage() {
   const [classes, setClasses] = useState<ClassData[]>([]);
   const [selectedClassId, setSelectedClassId] = useState<number | null>(null);
   const [exams, setExams] = useState<ExamData[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
   
   const [isCreateClassModalOpen, setIsCreateClassModalOpen] = useState(false);
   const [newClassName, setNewClassName] = useState("");
@@ -64,7 +67,6 @@ export default function DashboardPage() {
       const { data } = await apiClient.get("/classes/");
       setClasses(data);
       
-      // Auto select first class for students if available
       const publicClasses = data.filter((c: any) => c.subject !== "Self-Practice");
       if (publicClasses.length > 0) {
         setSelectedClassId(publicClasses[0].id);
@@ -152,7 +154,6 @@ export default function DashboardPage() {
     if (!window.confirm("Bạn có chắc chắn muốn xóa đề thi này không? Dữ liệu không thể khôi phục.")) return;
     try {
       await apiClient.delete(`/exams/${examId}`);
-      // Cập nhật lại danh sách ngay lập tức
       setSelfPracticeExams(prev => prev.filter(exam => exam.id !== examId));
     } catch (error) {
       console.error("Lỗi khi xóa đề thi:", error);
@@ -160,227 +161,173 @@ export default function DashboardPage() {
     }
   };
 
-  // Show loading screen while auth state is being determined
   if (authLoading) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center gap-3">
-        <div className="w-6 h-6 rounded-full border-2 border-brand-500 border-t-transparent animate-spin" />
-        <span className="text-slate-500 text-sm">Đang tải hệ thống...</span>
+      <div className="min-h-screen flex items-center justify-center gap-3 bg-white">
+        <div className="w-6 h-6 rounded-full border-2 border-[#0052CC] border-t-transparent animate-spin" />
       </div>
     );
   }
 
-  // If auth finished loading and still no user → redirect (should be handled by middleware,
-  // but this is a safety net to prevent a blank screen)
   if (!user) {
-    return (
-      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center gap-4">
-        <span className="text-slate-500 text-sm">Phiên đăng nhập đã hết hạn.</span>
-        <a href="/login" className="px-4 py-2 bg-brand-500 hover:bg-brand-600 text-white text-sm font-semibold rounded-lg transition-colors">
-          Đăng nhập lại
-        </a>
-      </div>
-    );
+    return null;
   }
+
+  const displayClasses = classes.filter(c => c.subject !== "Self-Practice");
+  const displayExams = exams;
+  const displaySelfPractice = selfPracticeExams;
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-800 flex flex-col">
+    <div className="min-h-screen bg-white text-slate-800 font-sans flex flex-col">
       {/* Header */}
-      <header className="border-b border-slate-200 bg-white/20 backdrop-blur-md sticky top-0 z-30">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <GraduationCap className="text-brand-500" size={32} />
-            <span className="font-extrabold text-lg tracking-tight">AI Exam Platform</span>
+      <header className="w-full bg-white px-8 py-4 flex items-center justify-between border-b border-gray-200 sticky top-0 z-30">
+        <div className="flex items-center">
+          <Link href="/">
+            <div className="border-[3px] border-purple-600 px-2 py-0.5 text-black font-black text-2xl tracking-tighter uppercase cursor-pointer">
+              Steps
+            </div>
+          </Link>
+        </div>
+        <nav className="hidden md:flex items-center gap-6 lg:gap-10 font-medium text-gray-700">
+          <Link href="/dashboard" className="hover:text-[#0052CC] transition-colors whitespace-nowrap">
+            Danh sách lớp học
+          </Link>
+          <Link href="/results" className="hover:text-[#0052CC] transition-colors whitespace-nowrap">
+            Kết quả học tập
+          </Link>
+          <Link href="/materials" className="hover:text-[#0052CC] transition-colors whitespace-nowrap">
+            Tài liệu
+          </Link>
+        </nav>
+        
+        {/* Search Bar */}
+        <div className="flex-1 max-w-lg mx-6 hidden md:block">
+          <div className="relative w-full">
+            <input 
+              type="text" 
+              placeholder="Tìm kiếm lớp học, đề thi..." 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-5 pr-14 py-2.5 border border-gray-300 rounded-full focus:outline-none focus:border-[#0052CC] focus:ring-1 focus:ring-[#0052CC] transition-all text-sm"
+            />
+            <button className="absolute right-0 top-0 bottom-0 px-4 bg-[#0052CC] text-white rounded-r-full hover:bg-blue-700 transition-colors flex items-center justify-center">
+              <Search size={18} />
+            </button>
           </div>
+        </div>
 
-          <div className="flex items-center gap-4">
-            <div className="relative" ref={profileMenuRef}>
-              <button
-                onClick={() => setShowProfileMenu(!showProfileMenu)}
-                className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-white hover:bg-slate-100 border border-slate-200 rounded-lg text-xs text-slate-500 cursor-pointer transition-colors"
-              >
-                <UserIcon size={14} className="text-slate-500" />
-                <span>{user.email}</span>
-                <span className="h-1.5 w-1.5 rounded-full bg-slate-700 mx-1"></span>
-                <span className="uppercase text-brand-400 font-bold">{user.role === "teacher" ? "Giáo viên" : "Học sinh"}</span>
-              </button>
-              
-              {showProfileMenu && (
-                <div className="absolute right-0 top-full mt-2 w-72 bg-white border border-slate-200 rounded-xl shadow-2xl z-50 overflow-hidden transform origin-top-right transition-all">
-                  <div className="p-4 border-b border-slate-200 bg-slate-100/30">
-                    <h4 className="font-bold text-slate-800 text-lg mb-0.5">{user.full_name || "Chưa cập nhật tên"}</h4>
-                    <div className="flex items-center text-slate-500 text-xs">
-                      <Mail size={12} className="mr-1" />
+        <div className="flex items-center gap-6">
+          <button className="text-gray-600 hover:text-black">
+            <Bell size={22} />
+          </button>
+          <div className="relative" ref={profileMenuRef}>
+            <button
+              onClick={() => setShowProfileMenu(!showProfileMenu)}
+              className="w-10 h-10 rounded-full bg-[#60A5FA] cursor-pointer hover:opacity-90 flex items-center justify-center text-white font-bold transition-opacity"
+            >
+              {user.full_name?.charAt(0) || user.email?.charAt(0).toUpperCase()}
+            </button>
+            
+            {showProfileMenu && (
+              <div className="absolute right-0 top-full mt-2 w-72 bg-white border border-slate-200 rounded-xl shadow-2xl z-50 overflow-hidden transform origin-top-right transition-all">
+                <div className="p-4 border-b border-slate-200 bg-slate-50 flex flex-col gap-2">
+                  <div>
+                    <h4 className="font-bold text-slate-800 text-lg leading-tight">{user.full_name || user.email}</h4>
+                    <span className="inline-block px-2 py-0.5 mt-1 text-[10px] font-bold uppercase tracking-wider text-white bg-[#0052CC] rounded-full">
+                      {user.role === "teacher" ? "Giáo viên" : "Học sinh"}
+                    </span>
+                  </div>
+                  
+                  <div className="flex flex-col gap-1.5 mt-1">
+                    <div className="flex items-center text-slate-600 text-sm">
+                      <Mail size={14} className="mr-2 text-slate-400" />
                       {user.email}
                     </div>
-                  </div>
-                  <div className="p-4 space-y-3">
-                    <div className="flex items-start gap-3 text-sm">
-                      <div className="mt-0.5 text-brand-400"><Calendar size={16} /></div>
-                      <div>
-                        <p className="text-slate-500 text-xs font-semibold mb-0.5">Ngày sinh</p>
-                        <p className="text-slate-700">{user.date_of_birth ? new Date(user.date_of_birth).toLocaleDateString('vi-VN') : "Chưa cập nhật"}</p>
+                    
+                    {user.date_of_birth && (
+                      <div className="flex items-center text-slate-600 text-sm">
+                        <Calendar size={14} className="mr-2 text-slate-400" />
+                        {new Date(user.date_of_birth).toLocaleDateString('vi-VN')}
                       </div>
-                    </div>
-                    {user.role === "student" ? (
-                      <div className="flex items-start gap-3 text-sm">
-                        <div className="mt-0.5 text-brand-400"><MapPin size={16} /></div>
-                        <div>
-                          <p className="text-slate-500 text-xs font-semibold mb-0.5">Trường học</p>
-                          <p className="text-slate-700">{user.school || "Chưa cập nhật"}</p>
-                        </div>
+                    )}
+                    
+                    {user.school && (
+                      <div className="flex items-center text-slate-600 text-sm">
+                        <GraduationCap size={14} className="mr-2 text-slate-400" />
+                        {user.school}
                       </div>
-                    ) : (
-                      <div className="flex items-start gap-3 text-sm">
-                        <div className="mt-0.5 text-brand-400"><Briefcase size={16} /></div>
-                        <div>
-                          <p className="text-slate-500 text-xs font-semibold mb-0.5">Nơi công tác</p>
-                          <p className="text-slate-700">{user.workplace || "Chưa cập nhật"}</p>
-                        </div>
+                    )}
+                    
+                    {user.workplace && (
+                      <div className="flex items-center text-slate-600 text-sm">
+                        <Briefcase size={14} className="mr-2 text-slate-400" />
+                        {user.workplace}
                       </div>
                     )}
                   </div>
                 </div>
-              )}
-            </div>
-            <button
-              onClick={logout}
-              className="p-2 text-slate-500 hover:text-red-400 hover:bg-white border border-transparent hover:border-slate-200 rounded-lg transition-all duration-200"
-              title="Đăng xuất"
-            >
-              <LogOut size={18} />
-            </button>
+                <div className="p-2 border-t border-gray-100">
+                  <button
+                    onClick={logout}
+                    className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg flex items-center gap-2"
+                  >
+                    <LogOut size={16} /> Đăng xuất
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </header>
 
-      {/* Main Container */}
-      <main className="flex-grow max-w-7xl mx-auto w-full px-6 py-8 space-y-8">
-        {/* Banner Card */}
-        <div className="relative glass-panel rounded-2xl border border-slate-200 p-6 md:p-8 overflow-hidden shadow-2xl">
-          <div className="absolute -top-12 -right-12 w-48 h-48 rounded-full bg-brand-500/10 blur-3xl pointer-events-none" />
-          <div className="relative z-10 max-w-2xl">
-            <h2 className="text-2xl md:text-3xl font-extrabold text-slate-800 leading-tight mb-2">
-              Xin chào, {user.email}!
-            </h2>
-            <p className="text-slate-500 text-sm md:text-base leading-relaxed mb-6">
-              {user.role === "teacher"
-                ? "Quản lý các lớp học của bạn, bóc tách đề thi vật lý PDF/Word bằng AI và theo dõi thống kê kết quả học sinh làm bài."
-                : "Tham gia các lớp học của giáo viên hoặc tự upload đề thi PDF/Word lên góc tự luyện tập để hệ thống AI tạo bài thi trực tuyến."}
-            </p>
+      {/* Main Content Router */}
+      {user.role === "teacher" ? (
+        <TeacherDashboard 
+          user={user} 
+          displayClasses={displayClasses} 
+          displayExams={displayExams} 
+          onOpenCreateClass={() => setIsCreateClassModalOpen(true)}
+          searchQuery={searchQuery}
+        />
+      ) : (
+        <StudentDashboard 
+          user={user} 
+          displayClasses={displayClasses} 
+          displayExams={displayExams} 
+          displaySelfPractice={displaySelfPractice}
+          searchQuery={searchQuery}
+        />
+      )}
 
-            <div className="flex flex-wrap gap-4">
-              {user.role === "teacher" ? (
-                <>
-                  <Button variant="primary" size="sm" onClick={() => setIsCreateClassModalOpen(true)}>
-                    <Plus size={16} className="mr-1" /> Tạo lớp học mới
-                  </Button>
-                  <Link href="/exams/new">
-                    <Button variant="secondary" size="sm">
-                      <FileText size={16} className="mr-1" /> Tải đề thi lên lớp học
-                    </Button>
-                  </Link>
-                </>
-              ) : (
-                <Link href="/practice/upload">
-                  <Button variant="primary" size="sm">
-                    <FileText size={16} className="mr-1" /> Upload đề tự luyện tập
-                  </Button>
-                </Link>
-              )}
+      {/* Footer */}
+      <footer className="w-full border-t border-gray-300 bg-white">
+        <div className="max-w-[1200px] mx-auto px-6 py-8 flex flex-col md:flex-row justify-between text-[13px] text-gray-700">
+          <div className="leading-relaxed">
+            <p>Một sản phẩm thuộc một sinh viên AI-UET VNU</p>
+            <p>Trụ sở: 1194, Phường Láng, Hà Nội</p>
+            <p>SĐT: 0973908835</p>
+          </div>
+          <div className="flex items-start gap-4 mt-6 md:mt-0">
+            <span className="font-medium pt-1">Theo dõi tại:</span>
+            <div className="flex gap-3">
+              <div className="w-8 h-8 bg-black text-white rounded-full flex items-center justify-center">
+                <span className="font-bold text-xs">t</span>
+              </div>
+              <div className="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center">
+                <Facebook size={18} fill="currentColor" strokeWidth={0} />
+              </div>
+              <div className="w-8 h-8 bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-600 text-white rounded-full flex items-center justify-center">
+                <Instagram size={18} />
+              </div>
             </div>
           </div>
         </div>
+        <div className="text-center text-sm pb-6 text-gray-800">
+          © 2026 Teeco. All rights reserved.
+        </div>
+      </footer>
 
-        {/* Classes Section */}
-        <section className="space-y-4">
-          <h3 className="text-lg font-bold text-slate-700 flex items-center gap-2">
-            <BookOpen size={20} className="text-brand-400" />
-            Danh sách lớp học
-          </h3>
-          {classesLoading ? (
-            <div className="text-center py-8"><span className="text-slate-500 text-sm">Đang tải danh sách...</span></div>
-          ) : (
-            <SubjectList classes={classes} role={user.role} />
-          )}
-        </section>
-
-        {/* Exams Section (For Students) */}
-        {user.role === "student" && classes.length > 0 && (
-          <section className="space-y-4 border-t border-slate-200 pt-8">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <h3 className="text-lg font-bold text-slate-700 flex items-center gap-2">
-                <FileText size={20} className="text-brand-400" />
-                Đề kiểm tra lớp học
-              </h3>
-              
-              {/* Select class tabs */}
-              <div className="flex gap-2 overflow-x-auto pb-1 max-w-full">
-                {classes
-                  .filter((c) => c.subject !== "Self-Practice")
-                  .map((cls) => (
-                    <button
-                      key={cls.id}
-                      onClick={() => setSelectedClassId(cls.id)}
-                      className={`px-3 py-1.5 text-xs font-semibold rounded-lg shrink-0 border transition-all duration-200 ${
-                        selectedClassId === cls.id
-                          ? "bg-brand-500 border-brand-500 text-white shadow-md shadow-brand-500/10"
-                          : "bg-white border-slate-200 text-slate-500 hover:border-slate-300"
-                      }`}
-                    >
-                      {cls.name}
-                    </button>
-                  ))}
-              </div>
-            </div>
-
-            {examsLoading ? (
-              <div className="text-center py-12"><span className="text-slate-500 text-sm">Đang tải đề thi...</span></div>
-            ) : exams.length === 0 ? (
-              <div className="text-center py-12 bg-white/10 border border-slate-200 rounded-xl">
-                <p className="text-slate-500 text-sm">Chưa có bài thi nào được giao trong lớp này.</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                {exams.map((exam) => (
-                  <ExamCard key={exam.id} exam={exam as any} role={user.role} />
-                ))}
-              </div>
-            )}
-          </section>
-        )}
-
-        {/* Self-Practice Exams Section (For Students) */}
-        {user.role === "student" && classes.some(c => c.subject === "Self-Practice") && (
-          <section className="space-y-4 border-t border-slate-200 pt-8">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-bold text-brand-400 flex items-center gap-2">
-                <FileText size={20} />
-                Góc Luyện Tập (Đề Tự Tải Lên)
-              </h3>
-            </div>
-            
-            {selfPracticeLoading ? (
-              <div className="text-center py-12"><span className="text-slate-500 text-sm">Đang tải góc luyện tập...</span></div>
-            ) : selfPracticeExams.length === 0 ? (
-              <div className="text-center py-12 bg-white/10 border border-slate-200 rounded-xl">
-                <p className="text-slate-500 text-sm">Bạn chưa tải lên đề tự luyện nào.</p>
-                <Link href="/practice/upload" className="inline-block mt-3 text-brand-400 text-sm hover:underline">
-                  Tải đề thi lên ngay
-                </Link>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                {selfPracticeExams.map((exam) => (
-                  <ExamCard key={exam.id} exam={exam as any} role={user.role} onDelete={handleDeleteSelfPracticeExam} />
-                ))}
-              </div>
-            )}
-          </section>
-        )}
-      </main>
-
-      {/* Create Class Dialog (Teacher Only) */}
+      {/* Modals */}
       {user.role === "teacher" && (
         <Modal
           isOpen={isCreateClassModalOpen}
@@ -405,10 +352,6 @@ export default function DashboardPage() {
                 <option value="Toán">Toán Học</option>
                 <option value="Vật Lý">Vật Lý</option>
                 <option value="Hóa Học">Hóa Học</option>
-                <option value="Sinh Học">Sinh Học</option>
-                <option value="Tiếng Anh">Tiếng Anh</option>
-                <option value="IELTS">IELTS</option>
-                <option value="HSA">Đánh giá năng lực HSA</option>
                 <option value="Khác">Môn khác</option>
               </select>
             </div>
@@ -417,16 +360,15 @@ export default function DashboardPage() {
                 label="Nhập tên môn học"
                 value={customSubject}
                 onChange={(e) => setCustomSubject(e.target.value)}
-                placeholder="Ví dụ: Lịch sử"
                 required
               />
             )}
             <div className="flex gap-4 justify-end mt-6">
-              <Button type="button" variant="secondary" onClick={() => setIsCreateClassModalOpen(false)} disabled={createLoading}>
+              <Button type="button" variant="secondary" onClick={() => setIsCreateClassModalOpen(false)}>
                 Hủy
               </Button>
-              <Button type="submit" variant="primary" disabled={createLoading}>
-                {createLoading ? "Đang tạo..." : "Tạo ngay"}
+              <Button type="submit" variant="primary">
+                Tạo ngay
               </Button>
             </div>
           </form>

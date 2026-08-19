@@ -29,6 +29,10 @@ class SubmissionDraftUpdate(BaseModel):
         ..., 
         description="Trạng thái bài làm hiện tại trên giao diện để lưu tạm."
     )
+    remaining_time: Optional[int] = Field(
+        None, 
+        description="Thời gian làm bài còn lại (tính bằng giây)."
+    )
 
 
 # ==========================================

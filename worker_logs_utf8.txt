@@ -1,0 +1,35 @@
+worker-1  | warning: The `fitz` API is deprecated and will be removed in future. Use `import pymupdf` instead.
+worker-1  | /app/app/core/exceptions.py:33: StarletteDeprecationWarning: 'HTTP_422_UNPROCESSABLE_ENTITY' is deprecated. Use 'HTTP_422_UNPROCESSABLE_CONTENT' instead.
+worker-1  |   class FileParsingError(BaseAppException):
+worker-1  | /app/app/core/exceptions.py:37: StarletteDeprecationWarning: 'HTTP_422_UNPROCESSABLE_ENTITY' is deprecated. Use 'HTTP_422_UNPROCESSABLE_CONTENT' instead.
+worker-1  |   class InvalidSchemaError(BaseAppException):
+worker-1  |  
+worker-1  |  -------------- celery@ae902a17c343 v5.6.3 (recovery)
+worker-1  | --- ***** ----- 
+worker-1  | -- ******* ---- Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.41 2026-08-15 11:29:34
+worker-1  | - *** --- * --- 
+worker-1  | - ** ---------- [config]
+worker-1  | - ** ---------- .> app:         exam_platform_worker:0x7b2ea8665a80
+worker-1  | - ** ---------- .> transport:   redis://redis:6379/0
+worker-1  | - ** ---------- .> results:     redis://redis:6379/1
+worker-1  | - *** --- * --- .> concurrency: 12 (prefork)
+worker-1  | -- ******* ---- .> task events: OFF (enable -E to monitor tasks in this worker)
+worker-1  | --- ***** ----- 
+worker-1  |  -------------- [queues]
+worker-1  |                 .> celery           exchange=celery(direct) key=celery
+worker-1  |                 
+worker-1  | 
+worker-1  | [tasks]
+worker-1  |   . app.tasks.exam_processing.process_exam_upload_task
+worker-1  |   . app.tasks.grading_tasks.grade_essay_task
+worker-1  | 
+worker-1  | [2026-08-15 11:29:41,654: INFO/MainProcess] Connected to redis://redis:6379/0
+worker-1  | [2026-08-15 11:29:41,665: INFO/MainProcess] mingle: searching for neighbors
+worker-1  | [2026-08-15 11:29:42,702: INFO/MainProcess] mingle: all alone
+worker-1  | [2026-08-15 11:29:42,815: INFO/MainProcess] celery@ae902a17c343 ready.
+worker-1  | [2026-08-15 11:32:00,798: INFO/MainProcess] Task app.tasks.exam_processing.process_exam_upload_task[6ec23a29-3210-4e0e-968e-1eab34c2af54] received
+worker-1  | [2026-08-15 11:32:01,830: INFO/ForkPoolWorker-7] ─É├ú tß║úi th├ánh c├┤ng self_practice/2/11077c7d2b6d4764aa78c3a11cf8eaed.pdf vß╗ü /tmp/11077c7d2b6d4764aa78c3a11cf8eaed.pdf
+worker-1  | [2026-08-15 11:32:01,845: INFO/ForkPoolWorker-7] Bß║»t ─æß║ºu tr├¡ch xuß║Ñt file: /tmp/11077c7d2b6d4764aa78c3a11cf8eaed.pdf (MIME: application/pdf)
+worker-1  | [2026-08-15 11:32:07,655: INFO/ForkPoolWorker-7] HTTP Request: POST https://api.vilao.ai/v1/chat/completions "HTTP/1.1 200 OK"
+worker-1  | [2026-08-15 11:32:22,839: INFO/ForkPoolWorker-7] ─É├ú xß╗¡ l├╜ xong Job ID 8. Tß║ío th├ánh c├┤ng Exam ID 8.
+worker-1  | [2026-08-15 11:32:22,892: INFO/ForkPoolWorker-7] Task app.tasks.exam_processing.process_exam_upload_task[6ec23a29-3210-4e0e-968e-1eab34c2af54] succeeded in 22.022536934004165s: None

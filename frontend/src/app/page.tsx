@@ -1,122 +1,266 @@
 "use client";
-import React from "react";
+import React, { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import useAuth from "@/hooks/useAuth";
-import { Brain, FileText, BarChart3, GraduationCap } from "lucide-react";
+import Image from "next/image";
+import { FileSearch, ClipboardCheck, TrendingUp, Facebook, Instagram, Bell, User as UserIcon, Mail, LogOut } from "lucide-react";
 
 export default function Home() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
+  
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const profileMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (profileMenuRef.current && !profileMenuRef.current.contains(event.target as Node)) {
+        setShowProfileMenu(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-800 flex flex-col justify-between">
+    <div className="min-h-screen bg-[#F4F8FB] text-slate-800 font-sans">
       {/* Navbar */}
-      <header className="max-w-7xl mx-auto w-full px-6 py-5 flex items-center justify-between border-b border-slate-200">
-        <div className="flex items-center gap-2">
-          <GraduationCap className="text-brand-500" size={32} />
-          <span className="font-extrabold text-xl tracking-tight bg-gradient-to-r from-slate-100 to-slate-400 bg-clip-text text-transparent">
-            AI Exam Platform
-          </span>
+      <header className="w-full bg-[#F4F8FB] px-8 md:px-16 py-6 flex items-center justify-between sticky top-0 z-30">
+        <div className="flex items-center">
+          <Link href="/">
+            <div className="text-[#0052CC] font-black text-2xl tracking-tight cursor-pointer">
+              steps.
+            </div>
+          </Link>
         </div>
-        <nav className="flex items-center gap-4">
+        <nav className="hidden md:flex items-center gap-10 font-bold text-gray-800 text-[15px]">
+          <Link href="/" className="hover:text-[#0052CC] transition-colors">
+            Trang chủ
+          </Link>
+          <Link href="/blogs" className="hover:text-[#0052CC] transition-colors">
+            Blogs
+          </Link>
+          <Link href="/guide" className="hover:text-[#0052CC] transition-colors">
+            Hướng dẫn
+          </Link>
+        </nav>
+        <div className="flex items-center gap-6">
           {user ? (
-            <Link
-              href="/dashboard"
-              className="px-4 py-2 bg-brand-500 hover:bg-brand-600 text-white text-sm font-semibold rounded-lg shadow-lg shadow-brand-500/20 transition-all duration-200"
-            >
-              Vào hệ thống
-            </Link>
+            <div className="flex items-center gap-6">
+              <button className="text-gray-600 hover:text-black">
+                <Bell size={22} />
+              </button>
+              <div className="relative" ref={profileMenuRef}>
+                <button
+                  onClick={() => setShowProfileMenu(!showProfileMenu)}
+                  className="w-12 h-12 rounded-full bg-[#0052CC] cursor-pointer hover:opacity-90 flex items-center justify-center text-white font-bold transition-opacity shadow-md"
+                >
+                  {user.full_name?.charAt(0) || user.email?.charAt(0).toUpperCase()}
+                </button>
+                
+                {showProfileMenu && (
+                  <div className="absolute right-0 top-full mt-3 w-72 bg-white border border-slate-100 rounded-2xl shadow-2xl z-50 overflow-hidden transform origin-top-right transition-all">
+                    <div className="p-5 border-b border-slate-100 bg-slate-50">
+                      <h4 className="font-bold text-slate-900 text-[17px] mb-1">{user.full_name || user.email}</h4>
+                      <div className="flex items-center text-slate-500 text-xs font-medium">
+                        <Mail size={12} className="mr-1.5" />
+                        {user.email}
+                      </div>
+                    </div>
+                    <div className="p-2">
+                      <Link href="/dashboard">
+                        <button className="w-full text-left px-4 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50 rounded-xl flex items-center gap-3 mb-1 transition-colors">
+                           Vào Dashboard
+                        </button>
+                      </Link>
+                      <button
+                        onClick={logout}
+                        className="w-full text-left px-4 py-3 text-sm font-semibold text-red-600 hover:bg-red-50 rounded-xl flex items-center gap-3 transition-colors"
+                      >
+                        <LogOut size={16} /> Đăng xuất
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
           ) : (
-            <>
-              <Link href="/login" className="text-sm font-semibold text-slate-350 hover:text-slate-800 transition-colors">
+            <div className="flex items-center gap-8">
+              <Link
+                href="/login"
+                className="text-gray-800 font-bold text-[15px] hover:text-[#0052CC] transition-colors"
+              >
                 Đăng nhập
               </Link>
               <Link
                 href="/register"
-                className="px-4 py-2 bg-brand-500 hover:bg-brand-600 text-white text-sm font-semibold rounded-lg shadow-lg shadow-brand-500/20 transition-all duration-200"
+                className="px-7 py-3 bg-[#0052CC] hover:bg-blue-700 text-white text-[15px] font-bold rounded-full transition-all duration-200 shadow-md hover:-translate-y-0.5"
               >
                 Đăng ký
               </Link>
-            </>
+            </div>
           )}
-        </nav>
+        </div>
       </header>
 
       {/* Hero Section */}
-      <main className="flex-grow max-w-7xl mx-auto w-full px-6 py-20 flex flex-col items-center justify-center text-center">
-        <div className="inline-flex items-center gap-2 px-3 py-1 bg-brand-500/10 border border-brand-500/20 rounded-full text-brand-400 text-xs font-semibold mb-6">
-          <Brain size={14} /> Trợ lý AI chấm thi & Luyện tập tối tân
-        </div>
-        <h1 className="text-4xl sm:text-6xl font-black tracking-tight max-w-3xl leading-tight mb-6 bg-gradient-to-b from-slate-100 to-slate-400 bg-clip-text text-transparent">
-          Bóc Tách File Đề Thi & Chấm Bài Tự Luận Bằng AI
-        </h1>
-        <p className="text-slate-500 text-lg sm:text-xl max-w-2xl leading-relaxed mb-10">
-          Chỉ cần tải lên file PDF/Word đề kiểm tra vật lý, hệ thống AI sẽ tự động phân loại, trích xuất câu hỏi, tạo bài thi trực tuyến và chấm điểm chi tiết bằng Claude.
-        </p>
+      <div 
+        className="w-full bg-cover bg-center bg-no-repeat"
+        style={{ backgroundImage: "url('/bg-hero.jpg')" }}
+      >
+        <main className="max-w-[1300px] mx-auto w-full px-8 md:px-16 pt-16 pb-24">
+          <div className="flex flex-col md:flex-row items-center justify-between">
+            <div className="md:w-[55%] pr-8">
+              <h1 className="text-5xl md:text-[68px] font-extrabold text-[#0052CC] leading-[1.05] tracking-tight mb-8">
+                Mọi đề bài.<br />Một nơi để làm.
+              </h1>
+              <p className="text-gray-600 font-medium text-[18px] md:text-[22px] leading-relaxed mb-10 max-w-[90%]">
+                Biến đề PDF, Word hay tài liệu của bạn thành bài làm trực tuyến nhờ AI. Dành cho thầy cô giao bài và học sinh tự luyện tập.
+              </p>
 
-        <div className="flex flex-col sm:flex-row gap-4 mb-20 w-full sm:w-auto">
-          {user ? (
-            <Link
-              href="/dashboard"
-              className="px-8 py-3.5 bg-brand-500 hover:bg-brand-600 text-white text-base font-bold rounded-lg shadow-lg shadow-brand-500/20 transition-all duration-200"
-            >
-              Vào Dashboard làm bài
-            </Link>
-          ) : (
-            <>
-              <Link
-                href="/register"
-                className="px-8 py-3.5 bg-brand-500 hover:bg-brand-600 text-white text-base font-bold rounded-lg shadow-lg shadow-brand-500/20 transition-all duration-200"
-              >
-                Bắt đầu miễn phí
-              </Link>
-              <Link
-                href="/login"
-                className="px-8 py-3.5 bg-white border border-slate-200 hover:bg-slate-100/80 text-slate-700 text-base font-bold rounded-lg transition-all duration-200"
-              >
-                Trải nghiệm Demo
-              </Link>
-            </>
-          )}
-        </div>
+              <div className="flex items-center gap-6 mb-16">
+                {user ? (
+                  <Link
+                    href="/dashboard"
+                    className="px-10 py-4 bg-[#0052CC] hover:bg-blue-700 text-white text-[17px] font-bold rounded-full shadow-[0_8px_20px_rgba(0,82,204,0.3)] transition-all duration-300 hover:-translate-y-1"
+                  >
+                    Vào Dashboard
+                  </Link>
+                ) : (
+                  <>
+                    <Link
+                      href="/register"
+                      className="px-10 py-4 bg-[#0052CC] hover:bg-blue-700 text-white text-[17px] font-bold rounded-full shadow-[0_8px_20px_rgba(0,82,204,0.3)] transition-all duration-300 hover:-translate-y-1"
+                    >
+                      Bắt đầu ngay
+                    </Link>
+                    <Link
+                      href="/dashboard"
+                      className="text-gray-800 hover:text-[#0052CC] text-[17px] font-bold flex items-center gap-2 transition-colors"
+                    >
+                      Tìm hiểu thêm →
+                    </Link>
+                  </>
+                )}
+              </div>
 
-        {/* Feature Cards Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 w-full">
-          <div className="glass-card rounded-xl p-6 border border-slate-200 text-left">
-            <div className="p-3 bg-brand-500/10 rounded-lg text-brand-400 w-fit mb-4">
-              <FileText size={24} />
+              {/* Stats / Process Row */}
+              <div className="flex flex-wrap gap-12 md:gap-20">
+                <div>
+                  <div className="font-extrabold text-gray-900 text-2xl mb-1">Upload</div>
+                  <div className="text-gray-500 font-medium text-sm">chỉ trong vài giây</div>
+                </div>
+                <div>
+                  <div className="font-extrabold text-gray-900 text-2xl mb-1">Chấm điểm</div>
+                  <div className="text-gray-500 font-medium text-sm">AI tự động 100%</div>
+                </div>
+                <div>
+                  <div className="font-extrabold text-gray-900 text-2xl mb-1">Kết quả</div>
+                  <div className="text-gray-500 font-medium text-sm">thống kê chi tiết</div>
+                </div>
+              </div>
             </div>
-            <h3 className="font-bold text-lg text-slate-800 mb-2">Bóc tách tự động</h3>
-            <p className="text-slate-500 text-sm leading-relaxed">
-              Trích xuất đề kiểm tra từ file PDF scan hoặc Word thành bài thi online chỉ trong vài giây thông qua pipeline AI 2 bước.
-            </p>
+            <div className="md:w-[45%] flex justify-end mt-16 md:mt-0">
+              <Image
+                src="/student_illustration.svg"
+                alt="Học sinh đang học"
+                width={650}
+                height={500}
+                className="object-contain"
+                priority
+              />
+            </div>
+          </div>
+        </main>
+      </div>
+
+      {/* Feature Section */}
+      <div className="mt-12 mb-16 max-w-[1300px] mx-auto w-full px-6">
+          {/* Pills Box */}
+          <div className="bg-white rounded-3xl p-8 mb-6 shadow-md border border-gray-100">
+            <h2 className="text-[#0052CC] font-bold text-xl text-center mb-6">
+              Hỗ trợ giao diện các loại đề thi môn học bất kì
+            </h2>
+            <div className="flex flex-wrap justify-center gap-6">
+              {['Bài kiểm tra', 'THPTQG', 'IELTS', 'HSA', 'Tự luyện tập'].map((tag) => (
+                <span
+                  key={tag}
+                  className="bg-[#DDEBFA] text-gray-800 px-8 py-2.5 rounded-full text-[15px] font-medium shadow-sm hover:shadow-md transition-shadow cursor-default"
+                >
+                  {tag}
+                </span>
+              ))}
+            </div>
           </div>
 
-          <div className="glass-card rounded-xl p-6 border border-slate-200 text-left">
-            <div className="p-3 bg-brand-500/10 rounded-lg text-brand-400 w-fit mb-4">
-              <Brain size={24} />
-            </div>
-            <h3 className="font-bold text-lg text-slate-800 mb-2">Chấm tự luận bằng Claude</h3>
-            <p className="text-slate-500 text-sm leading-relaxed">
-              Tự động đối chiếu bài thi tự luận của học sinh với đáp án mẫu và chấm điểm theo rubric bằng mô hình AI tiên tiến.
-            </p>
-          </div>
+          {/* Cards Box */}
+          <div className="bg-[#EAF2FF] rounded-3xl p-10 shadow-inner">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              {/* Card 1 */}
+              <div className="bg-white rounded-2xl p-8 flex flex-col items-center text-center shadow-xl hover:-translate-y-1 transition-all duration-300">
+                <div className="w-16 h-16 bg-[#F0F6FF] rounded-xl flex items-center justify-center mb-6 text-[#0052CC] shadow-inner">
+                  <FileSearch size={32} strokeWidth={1.5} />
+                </div>
+                <h3 className="font-black text-xl text-gray-900 mb-3">Bóc tách tự động</h3>
+                <p className="text-gray-600 text-sm leading-relaxed">
+                  Trích xuất đề thi từ file PDF scan thành bài thi online nhờ AI
+                </p>
+              </div>
 
-          <div className="glass-card rounded-xl p-6 border border-slate-200 text-left">
-            <div className="p-3 bg-brand-500/10 rounded-lg text-brand-400 w-fit mb-4">
-              <BarChart3 size={24} />
+              {/* Card 2 */}
+              <div className="bg-white rounded-2xl p-8 flex flex-col items-center text-center shadow-xl hover:-translate-y-1 transition-all duration-300">
+                <div className="w-16 h-16 bg-[#F0F6FF] rounded-xl flex items-center justify-center mb-6 text-[#0052CC] shadow-inner">
+                  <ClipboardCheck size={32} strokeWidth={1.5} />
+                </div>
+                <h3 className="font-black text-xl text-gray-900 mb-3">AI chấm bài tự động</h3>
+                <p className="text-gray-600 text-sm leading-relaxed">
+                  Chấm tự động theo đáp án mẫu hoặc chấm tự luận theo barem sẵn nhờ AI
+                </p>
+              </div>
+
+              {/* Card 3 */}
+              <div className="bg-white rounded-2xl p-8 flex flex-col items-center text-center shadow-xl hover:-translate-y-1 transition-all duration-300">
+                <div className="w-16 h-16 bg-[#F0F6FF] rounded-xl flex items-center justify-center mb-6 text-[#0052CC] shadow-inner">
+                  <TrendingUp size={32} strokeWidth={1.5} />
+                </div>
+                <h3 className="font-black text-xl text-gray-900 mb-3">Thống kê kết quả</h3>
+                <p className="text-gray-600 text-sm leading-relaxed">
+                  Tự động đưa ra thống kê, biểu đồ, tính toán kết quả học tập.
+                </p>
+              </div>
             </div>
-            <h3 className="font-bold text-lg text-slate-800 mb-2">Thống kê & Phổ điểm</h3>
-            <p className="text-slate-500 text-sm leading-relaxed">
-              Hệ thống tự động vẽ biểu đồ phổ điểm, tính toán điểm trung bình/cao nhất/thấp nhất và xếp hạng kết quả lớp học.
-            </p>
           </div>
         </div>
-      </main>
 
-      {/* Footer */}
-      <footer className="max-w-7xl mx-auto w-full px-6 py-8 border-t border-slate-200 text-center text-xs text-slate-500">
-        © {new Date().getFullYear()} AI Exam Platform. All rights reserved.
-      </footer>
+        {/* Footer */}
+        <footer className="w-full border-t border-gray-200 bg-white mt-12">
+          <div className="max-w-[1300px] mx-auto w-full px-6 py-10 flex flex-col md:flex-row justify-between text-[14px] text-gray-600">
+            <div className="leading-relaxed">
+              <p className="font-bold text-[#0052CC] text-lg mb-2">AI Exam Platform</p>
+              <p>Sản phẩm thuộc một sinh viên AI-UET VNU</p>
+              <p>Trụ sở: 1194, Phường Láng, Hà Nội</p>
+              <p>SĐT: 0973908835</p>
+              <p>Email: minhducteco@gmail.com</p>
+            </div>
+            <div className="flex flex-col items-start md:items-end gap-3 mt-8 md:mt-0">
+              <span className="font-semibold text-gray-900">Theo dõi chúng tôi</span>
+              <div className="flex gap-4 mt-2">
+                <div className="w-10 h-10 bg-black text-white rounded-full flex items-center justify-center shadow-md hover:-translate-y-1 transition-transform cursor-pointer">
+                  <span className="font-bold text-lg">X</span>
+                </div>
+                <div className="w-10 h-10 bg-blue-600 text-white rounded-full flex items-center justify-center shadow-md hover:-translate-y-1 transition-transform cursor-pointer">
+                  <Facebook size={20} fill="currentColor" strokeWidth={0} />
+                </div>
+                <div className="w-10 h-10 bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-600 text-white rounded-full flex items-center justify-center shadow-md hover:-translate-y-1 transition-transform cursor-pointer">
+                  <Instagram size={20} />
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="border-t border-gray-100 py-5 text-center text-sm text-gray-500 bg-gray-50">
+            © 2026 AI Exam Platform. All rights reserved.
+          </div>
+        </footer>
     </div>
   );
 }
+

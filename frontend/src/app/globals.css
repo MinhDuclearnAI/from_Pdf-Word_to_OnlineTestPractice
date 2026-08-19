@@ -6,7 +6,7 @@
   --background: #f8fafc;
   --foreground: #0f172a;
   --glass-bg: rgba(255, 255, 255, 0.95);
-  --glass-border: rgba(225, 29, 72, 0.1);
+  --glass-border: rgba(0, 82, 204, 0.1);
 }
 
 body {
@@ -50,12 +50,12 @@ textarea::placeholder, input::placeholder {
 }
 
 .glass-card:hover {
-  border-color: rgba(225, 29, 72, 0.3);
-  box-shadow: 0 12px 36px -12px rgba(225, 29, 72, 0.15);
+  border-color: rgba(0, 82, 204, 0.3);
+  box-shadow: 0 12px 36px -12px rgba(0, 82, 204, 0.15);
   transform: translateY(-2px);
 }
 
-/* Custom Scrollbar tông Đỏ/Trắng */
+/* Custom Scrollbar tông Xanh/Trắng */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -66,10 +66,10 @@ textarea::placeholder, input::placeholder {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(225, 29, 72, 0.6);
+  background: rgba(0, 82, 204, 0.6);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(225, 29, 72, 0.9);
+  background: rgba(0, 82, 204, 0.9);
 }

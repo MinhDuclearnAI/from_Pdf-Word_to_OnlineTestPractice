@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useExamStore } from "@/store/examStore";
 import { useExamDraft } from "@/hooks/useExamDraft";
 import QuestionRenderer from "./QuestionRenderer";
@@ -73,14 +73,69 @@ export const ExamPlayer: React.FC<ExamPlayerProps> = ({ exam, questions: rawQues
     });
   }, [rawQuestions]);
 
-  const { forceSave } = useExamDraft(exam.id);
+  const { forceSave, loadDraft } = useExamDraft(exam.id);
   const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false);
   const [activePartIndex, setActivePartIndex] = useState<number>(0);
   const [showGrid, setShowGrid] = useState(false); // Bật tắt danh sách tất cả câu hỏi
+  const [isInitialized, setIsInitialized] = useState(false);
 
   useEffect(() => {
-    initializeStore(exam.duration);
-  }, [exam, initializeStore]);
+    const init = async () => {
+      const data = await loadDraft();
+      let initialTime = null;
+      if (data && data.remaining_time !== undefined && data.remaining_time !== null) {
+        initialTime = data.remaining_time;
+      }
+      initializeStore(exam.duration, data?.answers || {}, initialTime);
+      setIsInitialized(true);
+    };
+    init();
+  }, [exam.id, exam.duration, initializeStore, loadDraft]);
+
+  // Use a ref to store the latest forceSave function to avoid useEffect re-runs
+  const forceSaveRef = useRef(forceSave);
+  useEffect(() => {
+    forceSaveRef.current = forceSave;
+  }, [forceSave]);
+
+  useEffect(() => {
+    // Chèn 1 state giả vào history để chặn Back
+    window.history.pushState(null, "", window.location.href);
+
+    const handlePopState = (e: PopStateEvent) => {
+      // Push lại để chặn Back thực sự
+      window.history.pushState(null, "", window.location.href);
+      
+      if (confirm("Bạn có chắc chắn muốn thoát khỏi phòng thi? Bài làm chưa nộp sẽ chỉ được lưu nháp.")) {
+        void (async () => {
+          await forceSaveRef.current();
+          window.location.replace("/dashboard");
+        })();
+      }
+    };
+
+    window.addEventListener("popstate", handlePopState);
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+    };
+  }, []);
+
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      forceSaveRef.current(); // Thử lưu trước khi tắt tab
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, []);
+
+  const handleExit = async () => {
+    if (confirm("Bạn có chắc chắn muốn thoát khỏi phòng thi? Bài làm chưa nộp sẽ chỉ được lưu nháp.")) {
+      await forceSave();
+      window.location.replace("/dashboard");
+    }
+  };
 
   const passageGroups = useMemo(() => {
     if (!questions || questions.length === 0) return [];
@@ -344,11 +399,7 @@ export const ExamPlayer: React.FC<ExamPlayerProps> = ({ exam, questions: rawQues
       <header className="flex-shrink-0 h-16 px-4 md:px-6 bg-white border-b border-slate-200 flex items-center justify-between z-30 shadow-sm">
         <div className="flex items-center gap-4 md:gap-6">
           <button 
-            onClick={() => {
-              if (confirm("Bạn có chắc chắn muốn thoát khỏi phòng thi? Bài làm chưa nộp sẽ chỉ được lưu nháp.")) {
-                router.push("/dashboard");
-              }
-            }}
+            onClick={handleExit}
             className="p-2 rounded-xl border border-slate-200 text-slate-500 hover transition-colors"
             title="Thoát"
           >

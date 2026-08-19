@@ -241,6 +241,7 @@ def get_class_exams(
                 subject=e.subject,
                 test_type=e.exam_type.value,
                 duration=e.duration or 0,
+                created_at=e.created_at,
                 is_active=is_active,
                 score=student_scores.get(e.id)
             )

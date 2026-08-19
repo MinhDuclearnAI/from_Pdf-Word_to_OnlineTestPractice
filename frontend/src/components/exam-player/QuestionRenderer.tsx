@@ -40,8 +40,34 @@ export const QuestionRenderer: React.FC<QuestionRendererProps> = ({
   childAnswers,
   onChildAnswerChange,
 }) => {
+  const rawQText = question.question_text || "";
+  let instructionText = rawQText;
+  let contentText = "";
+
+  if (
+    question.component_type &&
+    ["table_completion", "summary_completion", "diagram_label_completion", "sentence_completion"].includes(
+      question.component_type
+    )
+  ) {
+    const parts = rawQText.split(/\n\n+/);
+    if (parts.length > 1) {
+      instructionText = parts[0];
+      contentText = parts.slice(1).join("\n\n");
+      // Xóa rác [blank] nếu content chỉ toàn là [blank]
+      if (/^(\[blank(?:_\d+)?\]|\s)+$/i.test(contentText)) {
+        contentText = "";
+      }
+    } else {
+      instructionText = parts[0];
+    }
+  }
+
+  // Dọn dẹp triệt để rác [blank_X] khỏi instructionText để Red Badge luôn sạch
+  instructionText = instructionText.replace(/\[blank(?:_\d+)?\]/gi, '').trim();
+
   const renderQuestionComponent = () => {
-    const qText = question.question_text || "";
+    const qText = rawQText;
     switch (question.component_type) {
       case "multiple_choice":
       case "true_false_not_given":
@@ -144,23 +170,40 @@ export const QuestionRenderer: React.FC<QuestionRendererProps> = ({
           {/* MỚI: Render Red IELTS Badge cho Instruction */}
           <div className="bg-[#e22f2f] text-white p-3 md:px-5 md:py-3.5 rounded-xl mb-6 shadow-sm flex flex-col md:flex-row md:items-center gap-2 md:gap-4 leading-relaxed">
             <span className="font-bold text-[15px] whitespace-nowrap">{labelPrefix} {questionNumber}</span>
-            <span className="font-medium text-white/95 text-[15px]">{question.question_text}</span>
+            <span className="font-medium text-white/95 text-[15px]">{instructionText}</span>
           </div>
 
-          {/* Render Children or Grouped Input */}
-          {(question.component_type === "table_completion" || question.component_type === "summary_completion" || question.component_type === "diagram_label_completion" || question.component_type === "sentence_completion") ? (
-             <FillBlankInput
-               questionId={question.id}
-               questionText={""} // Pass rỗng vì đã render ở trên bằng Red Badge
-               selectedAnswer={selectedAnswer}
-               onChange={onChange}
-               disabled={disabled}
-               childQuestions={childQuestions}
-               childAnswers={childAnswers}
-               onChildAnswerChange={onChildAnswerChange}
-               imageUrl={question.image_url}
-             />
-          ) : (
+          {/* MỚI: Xác định xem có nên ẩn text của câu hỏi con hay không */}
+          {(() => {
+            const insLower = instructionText.toLowerCase();
+            const compType = question.component_type || "";
+            
+            // Nếu block parent CÓ ẢNH → child text luôn là hallucination → ẩn đi
+            // Ngoại trừ instruction rõ ràng yêu cầu trả lời câu hỏi
+            const hasImage = !!question.image_url;
+            const isExplicitShow = insLower.includes("answer the question") 
+                                 || insLower.includes("answer the following")
+                                 || insLower.includes("complete the sentence");
+            
+            const hideChildQuestionText = hasImage && !isExplicitShow;
+
+            return (
+              <>
+                {/* Render Children or Grouped Input */}
+                {(compType === "table_completion" || compType === "summary_completion" || compType === "diagram_label_completion" || compType === "sentence_completion") ? (
+                   <FillBlankInput
+                     questionId={question.id}
+                     questionText={contentText} // Truyền nội dung thật xuống thay vì pass rỗng
+                     selectedAnswer={selectedAnswer}
+                     onChange={onChange}
+                     disabled={disabled}
+                     childQuestions={childQuestions}
+                     childAnswers={childAnswers}
+                     onChildAnswerChange={onChildAnswerChange}
+                     imageUrl={question.image_url}
+                     hideChildQuestionText={hideChildQuestionText}
+                   />
+                ) : (
              <div className="space-y-4 pt-4 border-t border-slate-100">
                {childQuestions.map((child) => (
                  <QuestionRenderer
@@ -175,6 +218,9 @@ export const QuestionRenderer: React.FC<QuestionRendererProps> = ({
                ))}
              </div>
           )}
+          </>
+        );
+      })()}
         </div>
       ) : (
         renderQuestionComponent()

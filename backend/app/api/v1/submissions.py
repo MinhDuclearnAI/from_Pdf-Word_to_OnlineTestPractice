@@ -148,11 +148,14 @@ def autosave_submission(
         draft = SubmissionDraft(
             student_id=current_user.id,
             exam_id=exam_id,
-            answers=draft_in.answers
+            answers=draft_in.answers,
+            remaining_time=draft_in.remaining_time
         )
         db.add(draft)
     else:
         draft.answers = draft_in.answers
+        if draft_in.remaining_time is not None:
+            draft.remaining_time = draft_in.remaining_time
         
     db.commit()
     return {"message": "Đã lưu nháp thành công."}
@@ -176,8 +179,11 @@ def get_submission_draft(
     ).first()
     
     if not draft:
-        return {"answers": {}}
-    return {"answers": draft.answers}
+        return {"answers": {}, "remaining_time": None}
+    return {
+        "answers": draft.answers,
+        "remaining_time": draft.remaining_time
+    }
 
 
 # ==========================================

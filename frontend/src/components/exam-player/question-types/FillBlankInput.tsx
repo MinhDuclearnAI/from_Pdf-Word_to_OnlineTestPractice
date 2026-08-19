@@ -10,6 +10,7 @@ interface FillBlankInputProps {
   childAnswers?: Record<string, any>;
   onChildAnswerChange?: (childId: string | number, answer: any) => void;
   imageUrl?: string;
+  hideChildQuestionText?: boolean;
 }
 
 export const FillBlankInput: React.FC<FillBlankInputProps> = ({
@@ -21,6 +22,7 @@ export const FillBlankInput: React.FC<FillBlankInputProps> = ({
   childAnswers,
   onChildAnswerChange,
   imageUrl,
+  hideChildQuestionText = false,
 }) => {
   // Hỗ trợ ___ hoặc [blank] hoặc [blank_1], [blank_2]
   const BLANK_REGEX = /___+|\[blank(?:_\d+)?\]/gi;
@@ -70,8 +72,14 @@ export const FillBlankInput: React.FC<FillBlankInputProps> = ({
               const cAns = childAnswers?.[String(child.id)] || "";
               const qNum = child.displayNumber || child.original_question_number || "-";
               return (
-                <div key={child.id} className="flex items-center gap-3 bg-slate-50 px-3 py-2.5 rounded-xl border border-slate-200">
+                <div key={child.id} className="flex items-center gap-3 bg-slate-50 px-3 py-2.5 rounded-xl border border-slate-200 flex-wrap">
                   <span className="font-bold text-slate-600 text-sm bg-white px-2 py-1 rounded-lg shadow-sm border border-slate-200 min-w-[28px] text-center flex-shrink-0">{qNum}</span>
+                  {child.question_text && 
+                   !hideChildQuestionText &&
+                   !/^Question\s*\d+$/i.test(child.question_text) && 
+                   !/^Blank\s*\d+$/i.test(child.question_text) && (
+                     <span className="text-slate-700 font-medium mr-2 flex-1 min-w-[200px]">{child.question_text}</span>
+                  )}
                   <input
                     type="text"
                     disabled={disabled}

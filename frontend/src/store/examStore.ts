@@ -6,7 +6,7 @@ interface ExamState {
   currentIndex: number;
   timeRemaining: number;
   isSubmitting: boolean;
-  initializeStore: (durationMinutes: number, initialAnswers?: Record<string, any>) => void;
+  initializeStore: (durationMinutes: number, initialAnswers?: Record<string, any>, initialTimeRemaining?: number | null) => void;
   setAnswer: (questionId: string, answer: any) => void;
   toggleFlag: (questionIndex: number) => void;
   setCurrentIndex: (index: number) => void;
@@ -21,12 +21,12 @@ export const useExamStore = create<ExamState>((set) => ({
   currentIndex: 0,
   timeRemaining: 0,
   isSubmitting: false,
-  initializeStore: (durationMinutes, initialAnswers = {}) =>
+  initializeStore: (durationMinutes, initialAnswers = {}, initialTimeRemaining = null) =>
     set({
       answers: initialAnswers,
       flaggedQuestions: {},
       currentIndex: 0,
-      timeRemaining: durationMinutes * 60,
+      timeRemaining: initialTimeRemaining !== null ? initialTimeRemaining : durationMinutes * 60,
       isSubmitting: false,
     }),
   setAnswer: (questionId, answer) =>

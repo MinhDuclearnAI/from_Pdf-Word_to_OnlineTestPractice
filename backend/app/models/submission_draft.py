@@ -25,6 +25,9 @@ class SubmissionDraft(Base):
     # Ví dụ: {"question_id_1": ["A"], "question_id_2": ["apple", "banana"]}
     answers = Column(JSONB, nullable=False, server_default='{}')
 
+    # Thời gian còn lại khi thoát (tính bằng giây)
+    remaining_time = Column(Integer, nullable=True)
+
     # Thời gian lưu nháp cuối cùng
     last_saved_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 

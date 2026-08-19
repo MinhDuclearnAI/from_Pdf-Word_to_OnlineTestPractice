@@ -46,7 +46,10 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-6 bg-slate-50">
+    <div 
+      className="min-h-screen flex items-center justify-center p-6 bg-cover bg-center bg-no-repeat bg-[#F4F8FB]"
+      style={{ backgroundImage: "url('/bg-login.jpg')" }}
+    >
       <div className="w-full max-w-md glass-panel rounded-2xl border border-slate-200 p-8 shadow-2xl space-y-6">
         <div className="flex flex-col items-center text-center space-y-2">
           <div className="p-3 bg-brand-500/10 rounded-full text-brand-500 border border-brand-500/20 mb-1">

@@ -132,3 +132,29 @@ def upload_self_practice_exam(
     except Exception as e:
         db.rollback()
         raise FileParsingError(f"Có lỗi xảy ra trong quá trình upload đề tự luyện: {str(e)}")
+
+# ==========================================
+# API: Hủy/Xóa Job Đề tự luyện (DELETE /practice/jobs/{job_id})
+# ==========================================
+@router.delete("/jobs/{job_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_self_practice_job(
+    job_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Xóa một tiến trình AI Job bị lỗi hoặc đang chạy.
+    Dành cho Học sinh/Giáo viên dọn dẹp các đề upload hỏng trên giao diện Tự luyện.
+    """
+    job = db.query(AIProcessingJob).filter(
+        AIProcessingJob.id == job_id,
+        AIProcessingJob.creator_id == current_user.id
+    ).first()
+    
+    if not job:
+        raise HTTPException(status_code=404, detail="Không tìm thấy Job hoặc bạn không có quyền xóa.")
+        
+    db.delete(job)
+    db.commit()
+    
+    return None

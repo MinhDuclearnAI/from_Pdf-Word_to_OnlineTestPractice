@@ -102,3 +102,31 @@ def upload_exam_file(
         db.rollback()
         # Bắt các lỗi không mong muốn trong quá trình ghi file hoặc lưu DB
         raise FileParsingError(f"Có lỗi xảy ra trong quá trình tải lên và khởi tạo luồng AI: {str(e)}")
+
+# ==========================================
+# 2. API: Hủy/Xóa AI Job (DELETE /exams/jobs/{job_id})
+# ==========================================
+from fastapi import HTTPException
+
+@router.delete("/jobs/{job_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_exam_job(
+    job_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_teacher)
+):
+    """
+    Xóa một tiến trình AI Job bị lỗi hoặc đang chạy.
+    Giúp Giáo viên dọn dẹp các Job rác bị treo hoặc báo lỗi trên giao diện.
+    """
+    job = db.query(AIProcessingJob).filter(
+        AIProcessingJob.id == job_id,
+        AIProcessingJob.creator_id == current_user.id
+    ).first()
+    
+    if not job:
+        raise HTTPException(status_code=404, detail="Không tìm thấy Job hoặc bạn không có quyền xóa.")
+        
+    db.delete(job)
+    db.commit()
+    
+    return None

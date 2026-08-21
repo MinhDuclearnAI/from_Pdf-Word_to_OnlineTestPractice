@@ -5,6 +5,7 @@ import QuestionRenderer from "./QuestionRenderer";
 import CountdownTimer from "./CountdownTimer";
 import SubmitConfirmModal from "./SubmitConfirmModal";
 import ReadingSplitScreen from "./question-types/ReadingSplitScreen";
+import TextAnnotationToolbar from "./TextAnnotationToolbar";
 import Button from "../ui/Button";
 import { ChevronLeft, ChevronRight, Flag, LayoutGrid, X, FileText } from "lucide-react";
 import apiClient from "@/lib/api-client";
@@ -432,6 +433,7 @@ export const ExamPlayer: React.FC<ExamPlayerProps> = ({ exam, questions: rawQues
 
       {/* 2. MAIN WORKSPACE */}
       <main className="flex-1 overflow-hidden relative">
+        <TextAnnotationToolbar />
         {isIELTSReadingFormat && activeGroup ? (
           // IELTS SPLIT SCREEN
           <ReadingSplitScreen

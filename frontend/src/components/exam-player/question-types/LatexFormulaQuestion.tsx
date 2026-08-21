@@ -9,6 +9,8 @@ interface LatexFormulaQuestionProps {
   selectedAnswer?: string;
   onChange: (answer: string) => void;
   disabled?: boolean;
+  questionNumber?: number | string;
+  labelPrefix?: string;
 }
 
 export const LatexFormulaQuestion: React.FC<LatexFormulaQuestionProps> = ({
@@ -17,6 +19,8 @@ export const LatexFormulaQuestion: React.FC<LatexFormulaQuestionProps> = ({
   selectedAnswer,
   onChange,
   disabled,
+  questionNumber,
+  labelPrefix = "QUESTION",
 }) => {
   // Helper to parse and render text with LaTeX blocks ($...$ or $$...$$)
   const renderTextWithLatex = (text: string) => {
@@ -44,8 +48,15 @@ export const LatexFormulaQuestion: React.FC<LatexFormulaQuestionProps> = ({
 
   return (
     <div className="w-full">
-      <div className="text-lg font-medium text-slate-800 mb-6 leading-relaxed">
-        {renderTextWithLatex(questionText)}
+      <div className="flex items-start gap-3 mb-6">
+        {questionNumber !== undefined && (
+          <span className="text-xs font-bold text-brand-300 uppercase tracking-wider bg-brand-500/15 border border-brand-500/30 px-3 py-1 rounded-full shadow-sm shrink-0 mt-0.5">
+            {labelPrefix} {questionNumber}
+          </span>
+        )}
+        <div className="text-lg font-medium text-slate-800 leading-relaxed flex-1">
+          {renderTextWithLatex(questionText)}
+        </div>
       </div>
 
       {options && options.length > 0 ? (

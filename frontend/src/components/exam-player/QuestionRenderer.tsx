@@ -46,7 +46,7 @@ export const QuestionRenderer: React.FC<QuestionRendererProps> = ({
 
   if (
     question.component_type &&
-    ["table_completion", "summary_completion", "diagram_label_completion", "sentence_completion"].includes(
+    ["table_completion", "summary_completion", "diagram_label_completion", "sentence_completion", "matching_features"].includes(
       question.component_type
     )
   ) {
@@ -80,6 +80,8 @@ export const QuestionRenderer: React.FC<QuestionRendererProps> = ({
             selectedAnswer={selectedAnswer}
             onChange={onChange}
             disabled={disabled}
+            questionNumber={questionNumber}
+            labelPrefix={labelPrefix}
           />
         );
       case "math_equation":
@@ -92,6 +94,8 @@ export const QuestionRenderer: React.FC<QuestionRendererProps> = ({
             selectedAnswer={selectedAnswer}
             onChange={onChange}
             disabled={disabled}
+            questionNumber={questionNumber}
+            labelPrefix={labelPrefix}
           />
         );
       case "essay":
@@ -104,6 +108,8 @@ export const QuestionRenderer: React.FC<QuestionRendererProps> = ({
             onChange={onChange}
             placeholder={question.answer_placeholder}
             disabled={disabled}
+            questionNumber={questionNumber}
+            labelPrefix={labelPrefix}
           />
         );
       case "fill_in_the_blank":
@@ -121,6 +127,8 @@ export const QuestionRenderer: React.FC<QuestionRendererProps> = ({
             selectedAnswer={selectedAnswer}
             onChange={onChange}
             disabled={disabled}
+            questionNumber={questionNumber}
+            labelPrefix={labelPrefix}
           />
         );
       default:
@@ -143,14 +151,9 @@ export const QuestionRenderer: React.FC<QuestionRendererProps> = ({
       id={`question-card-${question.id}`} 
       className="bg-white border border-slate-200/80 rounded-2xl p-5 md:p-6 shadow-sm transition-all duration-200 scroll-mt-6"
     >
-      {questionNumber !== undefined && (!childQuestions || childQuestions.length === 0) && (
-        <div className="flex items-center justify-between mb-3 pb-2.5 border-b border-slate-200/60">
-          <span className="text-xs font-bold text-brand-300 uppercase tracking-wider bg-brand-500/15 border border-brand-500/30 px-3 py-0.5 rounded-full shadow-sm">
-            {labelPrefix} {questionNumber}
-          </span>
-          {question.part_title && (
-            <span className="text-xs text-slate-500 font-medium">{question.part_title}</span>
-          )}
+      {question.part_title && (!childQuestions || childQuestions.length === 0) && (
+        <div className="flex items-center justify-end mb-2">
+          <span className="text-xs text-slate-400 font-medium">{question.part_title}</span>
         </div>
       )}
       
@@ -190,7 +193,7 @@ export const QuestionRenderer: React.FC<QuestionRendererProps> = ({
             return (
               <>
                 {/* Render Children or Grouped Input */}
-                {(compType === "table_completion" || compType === "summary_completion" || compType === "diagram_label_completion" || compType === "sentence_completion") ? (
+                {(["table_completion", "summary_completion", "diagram_label_completion", "sentence_completion", "matching_features"].includes(compType) || hasImage) ? (
                    <FillBlankInput
                      questionId={question.id}
                      questionText={contentText} // Truyền nội dung thật xuống thay vì pass rỗng
@@ -205,6 +208,15 @@ export const QuestionRenderer: React.FC<QuestionRendererProps> = ({
                    />
                 ) : (
              <div className="space-y-4 pt-4 border-t border-slate-100">
+               {question.image_url && (
+                 <div className="mb-6 flex justify-center">
+                   <img 
+                     src={question.image_url} 
+                     alt="Hình minh họa"
+                     className="w-full max-w-3xl rounded-lg shadow-sm border border-slate-200/60 object-contain"
+                   />
+                 </div>
+               )}
                {childQuestions.map((child) => (
                  <QuestionRenderer
                    key={child.id}

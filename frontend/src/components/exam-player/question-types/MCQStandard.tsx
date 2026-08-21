@@ -7,6 +7,8 @@ interface MCQStandardProps {
   selectedAnswer?: string;
   onChange: (answer: string) => void;
   disabled?: boolean;
+  questionNumber?: number | string;
+  labelPrefix?: string;
 }
 
 export const MCQStandard: React.FC<MCQStandardProps> = ({
@@ -15,12 +17,21 @@ export const MCQStandard: React.FC<MCQStandardProps> = ({
   selectedAnswer,
   onChange,
   disabled,
+  questionNumber,
+  labelPrefix = "QUESTION",
 }) => {
   return (
     <div className="w-full">
-      <h3 className="text-base md font-semibold text-slate-800 mb-4 whitespace-pre-wrap leading-relaxed">
-        {questionText}
-      </h3>
+      <div className="flex items-start gap-3 mb-4">
+        {questionNumber !== undefined && (
+          <span className="text-xs font-bold text-brand-300 uppercase tracking-wider bg-brand-500/15 border border-brand-500/30 px-3 py-1 rounded-full shadow-sm shrink-0 mt-0.5">
+            {labelPrefix} {questionNumber}
+          </span>
+        )}
+        <h3 className="text-base font-semibold text-slate-800 whitespace-pre-wrap leading-relaxed flex-1">
+          {questionText}
+        </h3>
+      </div>
       <div className="space-y-2.5">
         {options.map((option, index) => {
           const optionLetter = String.fromCharCode(65 + index);

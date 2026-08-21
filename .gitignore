@@ -109,6 +109,7 @@ Thumbs.db
 # ============ LOGS ============
 *.log
 logs/
+debug_logs/
 celery.log
 celerybeat-schedule
 celerybeat.pid

@@ -330,6 +330,18 @@ def process_exam_upload_task(self, job_id: int, class_id: int, title: str, subje
 
             document_text = file_extractor.process_file(local_file_path, mime_type)
             
+            # --- DEBUG: Lưu raw text ra file để kiểm tra ---
+            try:
+                debug_dir = os.path.join(os.getcwd(), "debug_logs")
+                os.makedirs(debug_dir, exist_ok=True)
+                debug_file = os.path.join(debug_dir, f"raw_text_job_{job_id}.txt")
+                with open(debug_file, "w", encoding="utf-8") as f:
+                    f.write(document_text)
+                logger.info(f"Đã lưu raw text của Job {job_id} vào {debug_file}")
+            except Exception as e:
+                logger.warning(f"Lỗi khi lưu debug raw text: {e}")
+            # -----------------------------------------------
+            
             if not document_text or len(document_text.strip()) < 50:
                 raise ValueError("Không thể trích xuất văn bản từ file hoặc file quá ngắn.")
 
@@ -387,7 +399,7 @@ def process_exam_upload_task(self, job_id: int, class_id: int, title: str, subje
                         img_url = getattr(block, 'image_url', None)
                         
                         is_grouped = block.range_start is not None and block.range_end is not None and block.range_start != block.range_end
-                        groupable_types = ["table_completion", "summary_completion", "diagram_label_completion", "sentence_completion"]
+                        groupable_types = ["table_completion", "summary_completion", "diagram_label_completion", "sentence_completion", "matching_features"]
                         
                         if is_grouped or block.instruction:
                             instruction = block.instruction if block.instruction else ""

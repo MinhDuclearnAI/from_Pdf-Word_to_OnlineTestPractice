@@ -24,21 +24,51 @@ def strip_structure_markers(text: str) -> str:
 
 def clean_and_normalize_text(raw_text: str) -> str:
     """
-    Sử dụng spaCy để làm sạch các ký tự Unicode rác, chuẩn hóa khoảng trắng,
-    giúp giảm thiểu token rác đẩy vào LLM, tiết kiệm chi phí và tăng độ chính xác.
+    Chuẩn hóa khoảng trắng ngang (space, tab) để làm sạch văn bản, 
+    NHƯNG tuyệt đối giữ nguyên các dấu xuống dòng (line breaks) để bảo toàn tách đoạn gốc.
     """
     if not raw_text or not raw_text.strip():
         return ""
 
+    import re
+    # Xóa khoảng trắng ngang thừa (space, tab) nhưng tạm thời giữ lại \n
+    text = re.sub(r'[^\S\n]+', ' ', raw_text)
+    
+    # SỬA LỖI NGẮT DÒNG (WRAPPING):
+    # Chỉ áp dụng quy tắc an toàn nhất: chữ trước là chữ thường (hoặc phẩy, gạch nối) 
+    # và chữ sau là chữ thường thì nối lại.
+    text = re.sub(r'([a-z,-])[ \t]*\n[ \t]*([a-z])', r'\1 \2', text)
+    
+    # Rút gọn các dòng trống liên tiếp (3 trở lên) thành 2 dòng trống (chuẩn tách đoạn \n\n)
+    text = re.sub(r'\n{3,}', '\n\n', text)
+    
+    return text.strip()
 
-    cleaned_lines = []
-    for line in raw_text.splitlines():
-        # Xóa khoảng trắng thừa ở đầu/cuối, chuẩn hóa multi-spaces thành 1 space
-        cleaned_line = " ".join(line.split())
-        if cleaned_line:
-            cleaned_lines.append(cleaned_line)
+def is_continuation(prev_text: str, next_text: str) -> bool:
+    if not prev_text or not next_text:
+        return False
+    prev_text = prev_text.strip()
+    next_text = next_text.strip()
+    if not prev_text or not next_text:
+        return False
+        
+    if prev_text.endswith("-"):
+        return True
+        
+    if next_text[0].islower():
+        return True
+        
+    last_word = prev_text.split()[-1].lower() if prev_text.split() else ""
+    if last_word in ["and", "or", "but", "the", "a", "an", "of", "in", "to", "with", "for", "on", "at", "by", "from", "as", "is", "are"]:
+        return True
+        
+    if prev_text.endswith(","):
+        return True
 
-    return "\n".join(cleaned_lines)
+    # Bỏ logic ghép khối theo độ dài để tránh gộp sai tiêu đề (Title) vào đoạn văn (Passage)
+    return False
+
+    return False
 
 def extract_text_from_pdf(file_path: str) -> Tuple[str, bool]:
     """
@@ -61,27 +91,75 @@ def extract_text_from_pdf(file_path: str) -> Tuple[str, bool]:
             p = asset["page"]
             if p not in page_assets:
                 page_assets[p] = []
-            page_assets[p].append(asset["image_url"])
+            page_assets[p].append(asset)
 
         doc = fitz.open(file_path)
+        import re
         
         for page_num in range(len(doc)):
             page = doc.load_page(page_num)
-            
-            # Chèn thẻ IMAGE_REF của trang này vào trước nội dung text của trang
-            if page_num in page_assets:
-                for img_url in page_assets[page_num]:
-                    text_content.append(f"\n[[IMAGE_REF: {img_url}]]\n")
+            page_height = page.rect.height
+            top_margin = 60
+            bottom_margin = page_height - 60
             
             # Sử dụng sort=True để PyMuPDF tự động phán đoán thứ tự đọc (Reading Order)
             blocks = page.get_text("blocks", sort=True)
+            
+            images_in_page = page_assets.get(page_num, [])
+            images_in_page.sort(key=lambda img: img["y0"])
+            
+            # 2. Xử lý Trộn (Interleave) Text và Ảnh theo trục Y để ảnh đúng vị trí
+            page_items = []
+            
             for b in blocks:
-                if b[6] == 0: # Text block
-                    page_text = b[4]
-                    if page_text.strip():
-                        is_scanned = False
+                x0, y0, x1, y1, text_data, block_no, block_type = b
+                if block_type == 0: # Text block
+                    page_text = text_data.strip()
+                    if not page_text:
+                        continue
+                        
+                    # Lọc rác dựa trên không gian (Spatial Filtering) cho Header/Footer
+                    is_in_margin = y0 < 70 or y1 > page_height - 70
+                    if is_in_margin and len(page_text) < 100:
+                        pt_lower = page_text.lower()
+                        is_page_num = bool(re.match(r'^\d+$', page_text)) or "page" in pt_lower
+                        is_url = bool(re.match(r'^https?://', pt_lower)) or bool(re.match(r'^www\.', pt_lower)) or ".com" in pt_lower or ".org" in pt_lower or ".vn" in pt_lower
+                        if is_page_num or is_url:
+                            continue
+                            
+                    page_items.append({
+                        "type": "text",
+                        "y0": y0,
+                        "content": page_text
+                    })
+                    is_scanned = False
+            
+            for asset in images_in_page:
+                page_items.append({
+                    "type": "image",
+                    "y0": asset["y0"],
+                    "url": asset["image_url"]
+                })
+                
+            # Sắp xếp lại toàn bộ item trên trang từ trên xuống dưới
+            page_items.sort(key=lambda item: item["y0"])
+            
+            for item in page_items:
+                if item["type"] == "image":
+                    text_content.append(f"\n[[IMAGE_REF: {item['url']}]]\n")
+                else:
+                    page_text = item["content"]
+                    if not text_content:
                         text_content.append(page_text)
-                # Bỏ qua b[6] == 1 (Image block) ở đây vì đã xử lý qua inventory_page ở trên
+                    else:
+                        prev_text = text_content[-1]
+                        if "[[IMAGE_REF" not in prev_text and is_continuation(prev_text, page_text):
+                            if text_content[-1].endswith("-"):
+                                text_content[-1] = text_content[-1][:-1] + page_text
+                            else:
+                                text_content[-1] = text_content[-1] + " " + page_text
+                        else:
+                            text_content.append(page_text)
 
         doc.close()
         
@@ -175,7 +253,9 @@ def extract_all_images_from_inventory(file_path: str, inventory: list) -> list:
                     if image_url:
                         assets_found.append({
                             "page": page_num,
-                            "image_url": image_url
+                            "image_url": image_url,
+                            "y0": rect_dict["y0"],
+                            "x0": rect_dict["x0"]
                         })
                     img_counter += 1
                 except Exception as crop_err:

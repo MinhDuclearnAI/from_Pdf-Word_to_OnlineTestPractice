@@ -7,6 +7,8 @@ interface EssayInputProps {
   onChange: (answer: string) => void;
   placeholder?: string;
   disabled?: boolean;
+  questionNumber?: number | string;
+  labelPrefix?: string;
 }
 
 export const EssayInput: React.FC<EssayInputProps> = ({
@@ -15,14 +17,23 @@ export const EssayInput: React.FC<EssayInputProps> = ({
   onChange,
   placeholder = "Nhập câu trả lời tự luận của bạn tại đây...",
   disabled,
+  questionNumber,
+  labelPrefix = "QUESTION",
 }) => {
   const wordCount = selectedAnswer.trim() ? selectedAnswer.trim().split(/\s+/).length : 0;
 
   return (
     <div className="w-full">
-      <h3 className="text-base md font-semibold text-slate-800 mb-3 whitespace-pre-wrap leading-relaxed">
-        {questionText}
-      </h3>
+      <div className="flex items-start gap-3 mb-3">
+        {questionNumber !== undefined && (
+          <span className="text-xs font-bold text-brand-300 uppercase tracking-wider bg-brand-500/15 border border-brand-500/30 px-3 py-1 rounded-full shadow-sm shrink-0 mt-0.5">
+            {labelPrefix} {questionNumber}
+          </span>
+        )}
+        <h3 className="text-base font-semibold text-slate-800 whitespace-pre-wrap leading-relaxed flex-1">
+          {questionText}
+        </h3>
+      </div>
       <div className="relative">
         <textarea
           disabled={disabled}

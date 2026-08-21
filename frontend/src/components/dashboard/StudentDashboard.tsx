@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import Link from "next/link";
 import PremiumClassCard from "./PremiumClassCard";
 import PremiumExamCard from "./PremiumExamCard";
+import apiClient from "@/lib/api-client";
 
 interface ClassData {
   id: number;
@@ -42,8 +43,15 @@ export default function StudentDashboard({ user, displayClasses, displayExams, d
     );
   };
 
-  const handleDelete = (id: number) => {
-    setDeletedExams(prev => [...prev, id]);
+  const handleDelete = async (id: number) => {
+    if (!window.confirm("Bạn có chắc chắn muốn xóa đề thi này không? Dữ liệu không thể khôi phục.")) return;
+    try {
+      await apiClient.delete(`/exams/${id}`);
+      setDeletedExams(prev => [...prev, id]);
+    } catch (error) {
+      console.error("Lỗi khi xóa đề thi:", error);
+      alert("Xóa đề thi thất bại, vui lòng thử lại!");
+    }
   };
 
   const filterExamsBySearch = (exams: ExamData[]) => {

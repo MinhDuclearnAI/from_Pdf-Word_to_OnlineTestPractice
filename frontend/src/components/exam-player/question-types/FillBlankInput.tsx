@@ -11,6 +11,8 @@ interface FillBlankInputProps {
   onChildAnswerChange?: (childId: string | number, answer: any) => void;
   imageUrl?: string;
   hideChildQuestionText?: boolean;
+  questionNumber?: number | string;
+  labelPrefix?: string;
 }
 
 export const FillBlankInput: React.FC<FillBlankInputProps> = ({
@@ -23,6 +25,8 @@ export const FillBlankInput: React.FC<FillBlankInputProps> = ({
   onChildAnswerChange,
   imageUrl,
   hideChildQuestionText = false,
+  questionNumber,
+  labelPrefix = "QUESTION",
 }) => {
   // Hỗ trợ ___ hoặc [blank] hoặc [blank_1], [blank_2]
   const BLANK_REGEX = /___+|\[blank(?:_\d+)?\]/gi;
@@ -102,9 +106,16 @@ export const FillBlankInput: React.FC<FillBlankInputProps> = ({
     return (
       <div className="w-full">
         {questionText && (
-          <p className="text-base font-semibold text-slate-800 mb-4 whitespace-pre-wrap leading-relaxed">
-            {questionText}
-          </p>
+          <div className="flex items-start gap-3 mb-4">
+            {questionNumber !== undefined && (
+              <span className="text-xs font-bold text-brand-300 uppercase tracking-wider bg-brand-500/15 border border-brand-500/30 px-3 py-1 rounded-full shadow-sm shrink-0 mt-0.5">
+                {labelPrefix} {questionNumber}
+              </span>
+            )}
+            <p className="text-base font-semibold text-slate-800 whitespace-pre-wrap leading-relaxed flex-1">
+              {questionText}
+            </p>
+          </div>
         )}
         <input
           type="text"
@@ -125,22 +136,29 @@ export const FillBlankInput: React.FC<FillBlankInputProps> = ({
         Sử dụng whitespace-pre-wrap để hiển thị đúng khoảng trắng và line-break.
         Các input sẽ tự động hiển thị inline cùng với text.
       */}
-      <div className="text-base font-medium text-slate-800 mb-4 whitespace-pre-wrap leading-loose font-mono md:font-sans">
-        {parts.map((part, index) => (
-          <React.Fragment key={index}>
-            <span>{part}</span>
-            {index < totalBlanks && (
-              <input
-                type="text"
-                disabled={disabled}
-                value={answersList[index] || ""}
-                onChange={(e) => handleInputChange(index, e.target.value)}
-                placeholder={`${index + 1}`}
-                className="inline-block mx-1 px-2 py-0.5 bg-white border border-slate-300 rounded-md text-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 text-center font-bold text-sm min-w-[60px] w-[80px] max-w-[120px] transition-all shadow-sm align-middle placeholder:text-slate-300 placeholder:font-normal"
-              />
-            )}
-          </React.Fragment>
-        ))}
+      <div className="flex items-start gap-3 mb-4">
+        {questionNumber !== undefined && (!childQuestions || childQuestions.length === 0) && (
+          <span className="text-xs font-bold text-brand-300 uppercase tracking-wider bg-brand-500/15 border border-brand-500/30 px-3 py-1 rounded-full shadow-sm shrink-0 mt-0.5">
+            {labelPrefix} {questionNumber}
+          </span>
+        )}
+        <div className="text-base font-medium text-slate-800 whitespace-pre-wrap leading-loose font-mono md:font-sans flex-1">
+          {parts.map((part, index) => (
+            <React.Fragment key={index}>
+              <span>{part}</span>
+              {index < totalBlanks && (
+                <input
+                  type="text"
+                  disabled={disabled}
+                  value={answersList[index] || ""}
+                  onChange={(e) => handleInputChange(index, e.target.value)}
+                  placeholder={`${index + 1}`}
+                  className="inline-block mx-1 px-2 py-0.5 bg-white border border-slate-300 rounded-md text-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 text-center font-bold text-sm min-w-[60px] w-[80px] max-w-[120px] transition-all shadow-sm align-middle placeholder:text-slate-300 placeholder:font-normal"
+                />
+              )}
+            </React.Fragment>
+          ))}
+        </div>
       </div>
     </div>
   );

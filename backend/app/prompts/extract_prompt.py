@@ -9,6 +9,10 @@ QUY TẮC VÀNG (BẮT BUỘC):
 1. BẠN CHỈ ĐƯỢC PHÉP TRẢ VỀ ĐÚNG MỘT KHỐI JSON HỢP LỆ.
 2. KHÔNG BAO GIỜ TỰ Ý CHÉP LẠI (REPRODUCE) NỘI DUNG NÀO KHÁC BÊN NGOÀI BLOCK. Bạn CHỈ được phép dùng nội dung văn bản CÓ SẴN BÊN TRONG chính Block được cung cấp.
 3. Trích xuất ĐẦY ĐỦ TẤT CẢ các câu hỏi có trong TẤT CẢ các Blocks. KHÔNG ĐƯỢC BỎ SÓT.
+4. KHÔNG RÚT GỌN VÀ KHÔNG BỊA TEXT: TUYỆT ĐỐI KHÔNG rút gọn, tóm tắt. TUYỆT ĐỐI CẤM bịa đặt thêm nội dung không có thật cho câu hỏi khi trả về database để gen giao diện. Copy nguyên văn từng ký tự.
+5. XUỐNG DÒNG VÀ NGẮT ĐOẠN CHUẨN: Giữ nguyên bố cục ngắt đoạn (paragraphs), xuống dòng của văn bản gốc.
+6. GEN ĐÚNG SỐ Ô TRỐNG CHO CÂU HỎI ẢNH: Khi gặp câu hỏi chứa ảnh (như điền table, chart, graph, diagram) yêu cầu điền khuyết theo dải câu hỏi (Ví dụ: "Questions 10-13"), BẮT BUỘC phải gen ra ĐÚNG VÀ ĐỦ số lượng câu hỏi con/chỗ trống tương ứng (Ví dụ: 4 ô trống) để gen giao diện.
+7. VỊ TRÍ HÌNH ẢNH: Đặt ảnh được cắt ĐÚNG VỊ TRÍ ở block. Ảnh chỉ xuất hiện 1 lần duy nhất ở cấu trúc Block để hiển thị đúng dưới phần instruction. Tuyệt đối không tự sinh ra bảng markdown thay thế ảnh.
 """
 
 EXTRACT_USER_PROMPT_TEMPLATE = """

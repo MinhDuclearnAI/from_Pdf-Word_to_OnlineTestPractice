@@ -20,6 +20,44 @@ ComponentType = Literal[
     "multiple_choice_ielts"
 ]
 
+TYPE_ALIASES = {
+    "multiple choice": "multiple_choice",
+    "multiple-choice": "multiple_choice",
+    "mcq": "multiple_choice",
+    "fill blank": "fill_in_the_blank",
+    "fill-in-the-blank": "fill_in_the_blank",
+    "writing": "essay",
+    "latex_formula": "math_equation",
+    # IELTS specific aliases
+    "tfng": "true_false_not_given",
+    "true/false/not given": "true_false_not_given",
+    "yes/no/not given": "true_false_not_given",
+    "ynng": "true_false_not_given",
+    "matching headings": "matching_headings",
+    "matching features": "matching_features",
+    "sentence completion": "sentence_completion",
+    "summary completion": "summary_completion",
+    "table completion": "table_completion",
+    "diagram label completion": "diagram_label_completion",
+    "multiple choice ielts": "multiple_choice_ielts",
+    "flowchart_completion": "diagram_label_completion",
+    "flow_chart_completion": "diagram_label_completion",
+    "flowchart completion": "diagram_label_completion",
+    "flow chart completion": "diagram_label_completion",
+    "diagram_completion": "diagram_label_completion",
+    "diagram completion": "diagram_label_completion",
+    "note_completion": "summary_completion",
+    "note completion": "summary_completion",
+    "form_completion": "table_completion",
+    "form completion": "table_completion",
+    "short_answer": "sentence_completion",
+    "short_answer_questions": "sentence_completion",
+    "short answer": "sentence_completion",
+    "question_answering": "sentence_completion",
+    "question answering": "sentence_completion",
+    "qa": "sentence_completion",
+}
+
 
 # ==========================================
 # 1. Schemas cho Output của AI (Parsing Pipeline)
@@ -38,9 +76,9 @@ class QuestionSchema(BaseModel):
         ..., 
         description="Phân loại UI Component để Frontend gọi chính xác component render"
     )
-    question_text: str = Field(
-        ..., 
-        description="Nội dung đầy đủ của câu hỏi"
+    question_text: Optional[str] = Field(
+        default="", 
+        description="Nội dung đầy đủ của câu hỏi (có thể rỗng nếu là câu hỏi con trong bảng)"
     )
     options: List[str] = Field(
         default_factory=list, 
@@ -58,60 +96,56 @@ class QuestionSchema(BaseModel):
         None, 
         description="Nội dung đoạn văn bài đọc (chỉ dành cho type 'reading_passage')"
     )
-    part_title: Optional[str] = Field(
-        None,
-        description="Tiêu đề của Phần / Bài đọc (ví dụ: 'READING PASSAGE 1')"
-    )
-    answer_placeholder: Optional[str] = Field(
-        None, 
-        description="Gợi ý hiển thị trong ô nhập liệu (Placeholder) đối với câu tự luận"
-    )
-    image_url: Optional[str] = Field(
-        None,
-        description="Đường dẫn đến hình ảnh/biểu đồ nếu câu hỏi này có kèm hình ảnh"
-    )
     block_id: Optional[str] = Field(
         None,
-        description="ID của block chứa câu hỏi này (nếu gọi batched extraction)"
+        description="ID của block cha chứa câu hỏi này (nếu có)"
     )
-    is_block_parent: bool = Field(
+    is_block_parent: Optional[bool] = Field(
         False,
-        description="Đánh dấu câu hỏi này là câu hỏi gốc đại diện cho 1 block (chứa các câu hỏi con)"
-    )
-    original_question_number: Optional[int] = Field(
-        None,
-        description="Số thứ tự câu hỏi gốc in trên đề bài (mỏ neo)"
+        description="Đánh dấu câu hỏi này là Parent đại diện cho 1 block câu hỏi"
     )
     parent_block_id: Optional[str] = Field(
         None,
-        description="Trỏ về block_id của câu hỏi cha nếu đây là câu hỏi con"
+        description="ID trỏ về câu hỏi Parent đại diện cho block"
+    )
+    part_title: Optional[str] = Field(
+        None,
+        description="Tiêu đề của Part hoặc Passage (vd: 'Passage 1')"
+    )
+    original_question_number: Optional[int] = Field(
+        None,
+        description="Số thứ tự thật của câu hỏi in trên đề thi gốc (vd: 1, 14, 36)"
+    )
+    answer_placeholder: Optional[str] = Field(
+        None,
+        description="Placeholder/gợi ý hiển thị trong ô nhập liệu (vd: 'NO MORE THAN THREE WORDS')"
+    )
+    image_url: Optional[str] = Field(
+        None,
+        description="URL ảnh đính kèm (nếu câu hỏi có hình ảnh riêng)"
+    )
+
+    model_config = ConfigDict(
+        populate_by_name=True,
+        use_enum_values=True
     )
 
     @model_validator(mode="before")
     @classmethod
     def normalize_llm_question(cls, value: Any) -> Any:
-        """Normalize common OpenAI-compatible LLM output before validation.
-
-        Providers frequently return the semantically equivalent keys
-        ``question_number``, ``question`` and ``answer``.  Keeping this
-        boundary normalization here lets the rest of the application rely on
-        one canonical question contract.
+        """
+        Validator thông minh chuẩn hóa dữ liệu trả về từ LLM trước khi Pydantic validate.
         """
         if not isinstance(value, dict):
             return value
 
         data = dict(value)
 
-        if "id" not in data and data.get("question_number") is not None:
-            data["id"] = f"q{data['question_number']}"
-        elif "id" in data:
-            data["id"] = str(data["id"])
-
-        if "question_text" not in data and data.get("question") is not None:
-            data["question_text"] = data["question"]
-
-        if "correct_answer" not in data and data.get("answer") is not None:
-            data["correct_answer"] = str(data["answer"])
+        raw_id = data.get("id") or data.get("question_id") or data.get("number")
+        if raw_id is None:
+            data["id"] = "temp_id"
+        else:
+            data["id"] = str(raw_id)
 
         raw_options = data.get("options", data.get("choices"))
         if isinstance(raw_options, dict):
@@ -129,34 +163,17 @@ class QuestionSchema(BaseModel):
             data["options"] = [str(option) for option in raw_options]
 
         raw_type = data.get("type")
-        type_aliases = {
-            "multiple choice": "multiple_choice",
-            "multiple-choice": "multiple_choice",
-            "mcq": "multiple_choice",
-            "fill blank": "fill_in_the_blank",
-            "fill-in-the-blank": "fill_in_the_blank",
-            "writing": "essay",
-            "latex_formula": "math_equation",
-            # IELTS specific aliases
-            "tfng": "true_false_not_given",
-            "true/false/not given": "true_false_not_given",
-            "yes/no/not given": "true_false_not_given",
-            "ynng": "true_false_not_given",
-            "matching headings": "matching_headings",
-            "matching features": "matching_features",
-            "sentence completion": "sentence_completion",
-            "summary completion": "summary_completion",
-            "table completion": "table_completion",
-            "diagram label completion": "diagram_label_completion",
-            "multiple choice ielts": "multiple_choice_ielts"
-        }
         if isinstance(raw_type, str):
-            data["type"] = type_aliases.get(raw_type.strip().lower(), raw_type.strip().lower())
+            data["type"] = TYPE_ALIASES.get(raw_type.strip().lower(), raw_type.strip().lower())
         elif data["options"]:
             data["type"] = "multiple_choice"
         else:
-            question_text = str(data.get("question_text", ""))
-            data["type"] = "fill_in_the_blank" if "_" in question_text else "essay"
+            q_raw = data.get("question_text")
+            question_text = str(q_raw) if q_raw is not None else ""
+            data["type"] = "fill_in_the_blank" if "_" in question_text else "sentence_completion"
+
+        if data.get("question_text") is None:
+            data["question_text"] = ""
 
         if data.get("type") == "true_false_not_given" and not data.get("options"):
             q_text_lower = str(data.get("question_text", "")).lower()
@@ -228,11 +245,21 @@ class IELTSBlockSchema(BaseModel):
         description="Danh sách các câu hỏi cụ thể bên trong block này"
     )
 
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_block_type(cls, value: Any) -> Any:
+        if isinstance(value, dict):
+            raw_type = value.get("type")
+            if isinstance(raw_type, str):
+                normalized = TYPE_ALIASES.get(raw_type.strip().lower(), raw_type.strip().lower())
+                value["type"] = normalized
+        return value
+
 class IELTSPassageSchema(BaseModel):
     """Schema cho một Passage trong đề thi IELTS."""
     passage_id: str = Field(..., description="ID của passage, ví dụ 'P1', 'P2', 'P3'")
-    title: Optional[str] = Field(None, description="Tiêu đề của bài đọc")
-    content: str = Field(..., description="Nội dung đầy đủ của bài đọc (loại bỏ các câu hỏi)")
+    title: Optional[str] = Field(default="", description="Tiêu đề của bài đọc")
+    content: Optional[str] = Field(default="", description="Nội dung đầy đủ của bài đọc (loại bỏ các câu hỏi)")
     blocks: List[IELTSBlockSchema] = Field(
         default_factory=list,
         description="Danh sách các block câu hỏi thuộc bài đọc này"

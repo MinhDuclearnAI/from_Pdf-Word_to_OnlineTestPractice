@@ -205,7 +205,9 @@ class AIParserService:
         def _clean_passage_paragraphs(raw_text: str) -> str:
             if not raw_text or not raw_text.strip():
                 return ""
-            paragraphs = re.split(r'\n\s*\n', raw_text)
+            # Nối các từ bị ngắt gạch nối ở cuối dòng trong PDF (vd: wine-\nmaking -> wine-making)
+            raw_text = re.sub(r'(\w+)-\s*\n\s*(\w+)', r'\1-\2', raw_text)
+            paragraphs = re.split(r'\n\s*\n+', raw_text)
             cleaned = []
             for p in paragraphs:
                 clean_p = " ".join(p.split())
@@ -213,52 +215,86 @@ class AIParserService:
                     cleaned.append(clean_p)
             return "\n\n".join(cleaned)
 
-        # Helper: Trích xuất Title và làm sạch phần đầu bài đọc
+        # Helper: Kiểm tra một chuỗi có thỏa mãn tiêu chuẩn Tiêu Đề Bài Đọc không
+        def _is_valid_title(cand: str) -> bool:
+            if not cand or len(cand) >= 80:
+                return False
+            cand = cand.strip()
+            
+            # Phải bắt đầu bằng chữ hoa (hoặc dấu ngoặc kép + chữ hoa)
+            first_char_str = re.sub(r'^[\'\"“‘\s]+', '', cand)
+            if not first_char_str or not first_char_str[0].isupper():
+                return False
+                
+            # 1. Không phải là đoạn văn có nhãn A., B., C.
+            if re.match(r'^[A-H]\.\s+', cand):
+                return False
+                
+            # 2. Không kết thúc bằng dấu chấm, phẩy, chấm phẩy, hai chấm, gạch nối (chấp nhận ! hoặc ?)
+            if cand.endswith(('.', ',', ';', ':', '-', '–')):
+                return False
+                
+            # 3. Không kết thúc bằng giới từ hoặc liên từ (chứng tỏ bị ngắt dòng giữa câu)
+            if re.search(r'\b(and|or|of|in|to|the|a|an|that|with|for|as|by|on|at|from|is|are|was|were)\s*$', cand, re.I):
+                return False
+                
+            # 4. Không bắt đầu bằng các từ nối đoạn văn hoặc liên từ mở đầu
+            if re.match(r'(?i)^(Although|According|When|In the|During|From|After|While|Because|However|Therefore|Moreover|Furthermore|Since|If|As a|It was|There is|They are)\b', cand):
+                return False
+                
+            return True
+
+        # Helper: Trích xuất Title và làm sạch phần đầu bài đọc mà không phá vỡ các đoạn văn
         def _extract_title_and_clean_passage(raw_text: str, default_title: str) -> tuple[str, str]:
             if not raw_text or not raw_text.strip():
                 return default_title, ""
             
             t = raw_text.strip()
             
-            # 1. Xóa câu hướng dẫn You should spend...
-            t = re.sub(r'(?i)^\s*You\s+should\s+spend\s+about\s+\d+\s+minut[eo]s\s+on\s+Questions?.*?(?:\n\s*\n|\.\s*\n)', '\n\n', t, flags=re.DOTALL)
-            # 2. Xóa rác "on pages X and Y." nếu bị sót lại ở đầu
-            t = re.sub(r'(?i)^\s*(?:which\s+are\s+based\s+on\s+)?(?:Reading\s+Passage\s+\d+\s+)?on\s+pages?\s+\d+(?:\s*(?:and|to|-)\s*\d+)?\.?\s*', '', t)
-            # 3. Xóa nhãn "READING PASSAGE X" ở đầu
-            t = re.sub(r'(?i)^\s*READING\s+PASSAGE\s+\d+\s*', '', t)
-            # 4. Xóa header chung IELTS nếu có
-            t = re.sub(r'^(IELTS|TEST|ACADEMIC|GENERAL|PRACTICE).*\n', '', t, flags=re.I).strip()
+            # 1. Xóa câu hướng dẫn You should spend... kể cả khi ngắt dòng ở giữa
+            t = re.sub(r'(?i)^\s*You\s+should\s+spend\s+about\s+\d+\s+minut[eo]s\s+on\s+Questions?.*?(?:pages?\s+\d+.*?\n|\.\s*\n)', '\n\n', t, flags=re.DOTALL)
+            # 2. Xóa các header IELTS ở đầu
+            t = re.sub(r'(?i)^\s*(?:IELTS|TEST|ACADEMIC|GENERAL|PRACTICE|READING\s+TEST).*\n', '\n', t)
             
-            paragraphs = [p.strip() for p in re.split(r'\n\s*\n', t) if p.strip()]
+            paragraphs = [p.strip() for p in re.split(r'\n\s*\n+', t) if p.strip()]
             if not paragraphs:
                 return default_title, ""
-            
-            clean_paragraphs = []
-            title = default_title
-            title_found = False
-
-            for p in paragraphs:
-                p_clean = " ".join(p.split())
-                # Bỏ qua nếu là nhãn READING PASSAGE X nằm lẻ loi
-                if re.match(r'(?i)^READING\s+PASSAGE\s+\d+$', p_clean):
-                    continue
-                # Bỏ qua nếu là câu spend about...
-                if re.match(r'(?i)^You\s+should\s+spend\s+about', p_clean):
-                    continue
-                if re.match(r'(?i)^on\s+pages?\s+\d+', p_clean):
-                    continue
                 
-                # Nếu chưa có title và đoạn này ngắn (< 100 ký tự, không dấu chấm kết thúc)
-                if not title_found and len(p_clean) < 100 and not p_clean.endswith('.'):
-                    title = p_clean
-                    title_found = True
-                else:
-                    clean_paragraphs.append(p_clean)
+            title = default_title
+            cleaned_paragraphs = []
+            
+            for p in paragraphs:
+                p_single_line = " ".join(p.split())
+                # Lọc bỏ đoạn rác meta
+                if re.match(r'(?i)^\s*(?:READING\s+PASSAGE\s+\d+|PASSAGE\s+\d+)(?:\s+on\s+pages?.*)?$', p_single_line):
+                    continue
+                if re.match(r'(?i)^\s*You\s+should\s+spend\s+about', p_single_line):
+                    continue
+                if re.match(r'(?i)^\s*(?:which\s+are\s+based\s+on\s+)?(?:Reading\s+Passage\s+\d+\s+)?(?:on\s+pages?.*)?$', p_single_line):
+                    continue
 
-            if not title_found and clean_paragraphs and len(clean_paragraphs[0]) < 120:
-                title = clean_paragraphs.pop(0)
+                # Nếu chưa tìm thấy title:
+                if title == default_title:
+                    lines = [l.strip() for l in p.split('\n') if l.strip()]
+                    first_line = lines[0]
+                    
+                    # Nếu cả đoạn p là tiêu đề ngắn (ví dụ: Destination Mars)
+                    if len(lines) == 1 and _is_valid_title(first_line):
+                        title = first_line
+                        continue
+                        
+                    # Nếu tiêu đề dính với dòng đầu của đoạn (ví dụ: Make That Wine!\nAustralia is a nation...)
+                    if len(lines) > 1 and _is_valid_title(first_line):
+                        title = first_line
+                        # Giữ nguyên phần còn lại của đoạn văn
+                        p_remaining = '\n'.join(lines[1:])
+                        cleaned_paragraphs.append(p_remaining)
+                        continue
 
-            return title, "\n\n".join(clean_paragraphs)
+                cleaned_paragraphs.append(p)
+                
+            final_body = _clean_passage_paragraphs('\n\n'.join(cleaned_paragraphs))
+            return title, final_body
 
         # Step 1: Tìm tất cả các Question Anchors thực sự (Loại bỏ câu hướng dẫn spend about... on Questions X-Y)
         raw_matches = list(re.finditer(r'(?i)\bQuestions?\s+(\d+)\s*[-–to\s]+\s*(\d+)', document_text))

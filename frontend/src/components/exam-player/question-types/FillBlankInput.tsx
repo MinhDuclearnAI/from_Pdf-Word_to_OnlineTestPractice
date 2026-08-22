@@ -33,8 +33,9 @@ export const FillBlankInput: React.FC<FillBlankInputProps> = ({
   options = [],
 }) => {
   // Regex nhận diện các mốc đục lỗ trong đoạn văn Summary:
-  // Hỗ trợ: (32), [32], 7.............., 8........, [blank], [blank_1], ......, _____
-  const SUMMARY_TOKEN_REGEX = /(\(\d+\)|\[\d+\]|\b\d+\s*[\.]{2,}|\b\d+\s*[_]{2,}|\[blank(?:_\d+)?\]|\.{3,}|_{2,})/gi;
+  // Hỗ trợ: (7)......, [7]......, 7......, 7. ......, [blank_7], [blank], ......, _____
+  // Đảm bảo khớp cả cặp số + chuỗi chấm/gạch nối liền sau làm 1 token duy nhất (tránh gen đúp 2 ô trống)
+  const SUMMARY_TOKEN_REGEX = /(\(\d+\)[\s\._]*|\[\d+\][\s\._]*|\b\d+[\s\.\)]*[\._]{2,}|\[blank(?:_\d+)?\]|\.{3,}|_{2,})/gi;
   
   // Regex cho các câu điền từ đơn lẻ
   const CHILD_BLANK_REGEX = /___+|\[blank(?:_\d+)?\]|\.{2,}|_{2,}/gi;

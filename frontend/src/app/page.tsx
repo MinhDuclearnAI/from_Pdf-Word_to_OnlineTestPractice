@@ -28,7 +28,7 @@ export default function Home() {
         <div className="flex items-center">
           <Link href="/">
             <div className="text-[#0052CC] font-black text-2xl tracking-tight cursor-pointer">
-              steps.
+              TeecoAI
             </div>
           </Link>
         </div>
@@ -257,7 +257,7 @@ export default function Home() {
             </div>
           </div>
           <div className="border-t border-gray-100 py-5 text-center text-sm text-gray-500 bg-gray-50">
-            © 2026 AI Exam Platform. All rights reserved.
+            © 2026 TeecoAI. All rights reserved.
           </div>
         </footer>
     </div>

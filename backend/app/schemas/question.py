@@ -137,6 +137,14 @@ class QuestionSchema(BaseModel):
         None,
         description="Số thứ tự thật của câu hỏi in trên đề thi gốc (vd: 1, 14, 36)"
     )
+    content_before: Optional[str] = Field(
+        None,
+        description="Văn bản trước chỗ trống (dành cho fill_in_the_blank, sentence_completion)"
+    )
+    content_after: Optional[str] = Field(
+        None,
+        description="Văn bản sau chỗ trống (dành cho fill_in_the_blank, sentence_completion)"
+    )
     answer_placeholder: Optional[str] = Field(
         None,
         description="Placeholder/gợi ý hiển thị trong ô nhập liệu (vd: 'NO MORE THAN THREE WORDS')"
@@ -193,7 +201,12 @@ class QuestionSchema(BaseModel):
             question_text = str(q_raw) if q_raw is not None else ""
             data["type"] = "fill_in_the_blank" if "_" in question_text else "sentence_completion"
 
-        if data.get("question_text") is None:
+        q_raw = data.get("question_text")
+        cb = data.get("content_before")
+        ca = data.get("content_after")
+        if (q_raw is None or str(q_raw).strip() == "") and (cb or ca):
+            data["question_text"] = f"{cb or ''} [blank] {ca or ''}".strip()
+        elif q_raw is None:
             data["question_text"] = ""
 
         if data.get("type") == "true_false_not_given" and not data.get("options"):

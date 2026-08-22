@@ -453,16 +453,18 @@ def process_exam_upload_task(self, job_id: int, class_id: int, title: str, subje
                                     # Có ảnh: chỉ giữ instruction, KHÔNG thêm [blank_N] vào question_text
                                     # Frontend sẽ dùng childQuestions để render Grid Inputs
                                     q_text = instruction.strip()
-                                elif block.type in ["matching_features", "matching_headings"]:
-                                    # Dạng Matching: Block parent CHỈ chứa Instruction + Danh sách lựa chọn A-F (b_content).
-                                    # KHÔNG thêm [blank_N] vào parent để Frontend render từng câu con kèm input riêng
-                                    q_text = f"{instruction}\n\n{b_content}".strip()
-                                elif block.type == "sentence_completion":
-                                    # Với Sentence Completion, block parent chỉ giữ Instruction,
-                                    # mỗi câu con tự render câu hoàn chỉnh kèm ô điền riêng
-                                    q_text = instruction.strip() if instruction else ""
+                                elif block.type in ["matching_features", "matching_headings", "sentence_completion"]:
+                                    # Dạng Matching & Sentence Completion: Block parent CHỈ chứa câu lệnh Instruction thuần túy
+                                    # Toàn bộ options/headings được lưu vào trường options
+                                    q_text = instruction.strip()
+                                elif block.type == "summary_completion":
+                                    # Với Summary Completion: phân tách rõ ràng giữa Instruction và Đoạn văn tóm tắt
+                                    if b_content:
+                                        q_text = f"{instruction.strip()}\n\n---SUMMARY_CONTENT---\n\n{b_content.strip()}"
+                                    else:
+                                        q_text = instruction.strip()
                                 else:
-                                    # Summary / Table completion dạng đoạn văn đục lỗ
+                                    # Table / diagram completion dạng đoạn văn đục lỗ
                                     import re as _re
                                     has_blanks = "___" in b_content or "[blank" in b_content or bool(_re.search(r'\.{3,}', b_content))
                                     if not has_blanks and q_count > 0:
@@ -471,19 +473,31 @@ def process_exam_upload_task(self, job_id: int, class_id: int, title: str, subje
                                     else:
                                         q_text = f"{instruction}\n\n{b_content}".strip()
                             else:
-                                # Not groupable (e.g. TFNG, short_answer) -> show instruction + b_content
-                                q_text = f"{instruction}\n\n{b_content}".strip()
+                                # Not groupable (e.g. TFNG, short_answer) -> show instruction
+                                q_text = instruction.strip() if instruction else f"{instruction}\n\n{b_content}".strip()
                             
                             answers = [getattr(q, 'correct_answer', '') for q in block.questions]
                             import json
                             merged_answers = json.dumps(answers, ensure_ascii=False) if any(answers) else ""
 
-                            # Lấy options dùng chung nếu là block Matching
+                            # Lấy options dùng chung nếu là block Matching / Headings
                             parent_opts = []
-                            if block.type in ["matching_features", "matching_headings"] and block.questions:
+                            import re as _re
+                            if block.type == "matching_headings":
+                                if b_content:
+                                    lines = [l.strip() for l in b_content.split("\n") if l.strip()]
+                                    headings = [l for l in lines if not _re.match(r'^(?:List of Headings|Headings)\b', l, _re.I)]
+                                    if headings:
+                                        parent_opts = headings
+                                if not parent_opts and block.questions:
+                                    parent_opts = getattr(block.questions[0], 'options', []) or []
+                            elif block.type in ["matching_features", "summary_completion"] and block.questions:
                                 first_q_opts = getattr(block.questions[0], 'options', [])
                                 if first_q_opts:
                                     parent_opts = first_q_opts
+                                elif b_content and block.type == "matching_features":
+                                    lines = [l.strip() for l in b_content.split("\n") if l.strip()]
+                                    parent_opts = [l for l in lines if not _re.match(r'^(?:List of|Researchers)\b', l, _re.I)]
 
                             parent_q = QuestionSchema(
                                 id=block.block_id,
@@ -517,6 +531,16 @@ def process_exam_upload_task(self, job_id: int, class_id: int, title: str, subje
                                     ca = getattr(q, 'content_after', '') or ''
                                     if cb or ca:
                                         child_text = f"{cb} [blank] {ca}".strip()
+                                    elif b_content and orig_num:
+                                        import re as _re
+                                        pat = _re.compile(rf'(?:^|\n)\s*(?:{orig_num}[\.\s\)]|\({orig_num}\))\s*([^\n]+)', _re.I)
+                                        m = pat.search(b_content)
+                                        if m:
+                                            raw_line = m.group(1).strip()
+                                            raw_line = _re.sub(r'^\s*\d+[\.\s\)]\s*', '', raw_line)
+                                            child_text = _re.sub(r'\.{2,}|_{2,}', '[blank]', raw_line)
+                                        else:
+                                            child_text = ""
                                     else:
                                         child_text = ""
 

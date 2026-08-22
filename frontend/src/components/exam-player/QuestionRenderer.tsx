@@ -45,27 +45,59 @@ export const QuestionRenderer: React.FC<QuestionRendererProps> = ({
   let instructionText = rawQText;
   let contentText = "";
 
-  if (
+  // 1. Phân tách rõ ràng giữa instruction và contentText
+  if (rawQText.includes("---SUMMARY_CONTENT---")) {
+    const summarySplit = rawQText.split("---SUMMARY_CONTENT---");
+    instructionText = summarySplit[0].trim();
+    contentText = summarySplit[1].trim();
+  } else if (
     question.component_type &&
-    ["table_completion", "summary_completion", "diagram_label_completion", "sentence_completion", "matching_features"].includes(
-      question.component_type
-    )
+    ["matching_headings", "matching_features"].includes(question.component_type)
   ) {
+    // Nếu trong text cũ có dính "List of Headings" hoặc "List of ...":
+    const listIndex = rawQText.search(/\n\s*(?:List of Headings|List of Researchers|List of [A-Za-z]+)\b/i);
+    if (listIndex !== -1) {
+      instructionText = rawQText.substring(0, listIndex).trim();
+      contentText = rawQText.substring(listIndex).trim();
+    } else {
+      instructionText = rawQText.trim();
+    }
+  } else if (
+    question.component_type &&
+    ["table_completion", "summary_completion", "diagram_label_completion"].includes(question.component_type)
+  ) {
+    // Với dạng bảng hoặc đục lỗ cũ
     const parts = rawQText.split(/\n\n+/);
     if (parts.length > 1) {
-      instructionText = parts[0];
-      contentText = parts.slice(1).join("\n\n");
-      // Xóa rác [blank] nếu content chỉ toàn là [blank]
-      if (/^(\[blank(?:_\d+)?\]|\s)+$/i.test(contentText)) {
-        contentText = "";
+      if (/^(?:Complete|Choose|Answer|Write|Do the following)\b/i.test(parts[0])) {
+        const insLines: string[] = [];
+        const contentLines: string[] = [];
+        let isStillInstruction = true;
+
+        for (const part of parts) {
+          if (isStillInstruction && (insLines.length < 2 || /(?:Choose|Write your answers|boxes \d+-\d+)/i.test(part))) {
+            insLines.push(part);
+          } else {
+            isStillInstruction = false;
+            contentLines.push(part);
+          }
+        }
+
+        instructionText = insLines.join("\n\n");
+        contentText = contentLines.join("\n\n");
       }
-    } else {
-      instructionText = parts[0];
     }
   }
 
   // Dọn dẹp triệt để rác [blank_X] khỏi instructionText để Red Badge luôn sạch
   instructionText = instructionText.replace(/\[blank(?:_\d+)?\]/gi, '').trim();
+
+  // Chuẩn hóa instructionText: loại bỏ toàn bộ dòng trống thừa, chỉ giữ đúng 1 dấu \n giữa các dòng
+  instructionText = instructionText
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .join("\n");
 
   const renderQuestionComponent = () => {
     const qText = rawQText;
@@ -173,8 +205,8 @@ export const QuestionRenderer: React.FC<QuestionRendererProps> = ({
         <div className="mt-2">
           {/* MỚI: Render Red IELTS Badge cho Instruction */}
           <div className="bg-[#e22f2f] text-white p-3 md:px-5 md:py-3.5 rounded-xl mb-6 shadow-sm flex flex-col md:flex-row md:items-center gap-2 md:gap-4 leading-relaxed">
-            <span className="font-bold text-[15px] whitespace-nowrap">{labelPrefix} {questionNumber}</span>
-            <span className="font-medium text-white/95 text-[15px]">{instructionText}</span>
+            <span className="font-bold text-[15px] whitespace-nowrap self-start md:self-auto">{labelPrefix} {questionNumber}</span>
+            <span className="font-medium text-white/95 text-[15px] whitespace-pre-line flex-1">{instructionText}</span>
           </div>
 
           {/* MỚI: Xác định xem có nên ẩn text của câu hỏi con hay không */}
@@ -203,18 +235,20 @@ export const QuestionRenderer: React.FC<QuestionRendererProps> = ({
                      disabled={disabled}
                    />
                 ) : (["table_completion", "summary_completion", "diagram_label_completion", "sentence_completion"].includes(compType) || hasImage) ? (
-                   <FillBlankInput
-                     questionId={question.id}
-                     questionText={contentText} // Truyền nội dung thật xuống thay vì pass rỗng
-                     selectedAnswer={selectedAnswer}
-                     onChange={onChange}
-                     disabled={disabled}
-                     childQuestions={childQuestions}
-                     childAnswers={childAnswers}
-                     onChildAnswerChange={onChildAnswerChange}
-                     imageUrl={question.image_url}
-                     hideChildQuestionText={hideChildQuestionText}
-                   />
+                    <FillBlankInput
+                      questionId={question.id}
+                      questionText={contentText || rawQText} // Truyền nội dung thật xuống thay vì pass rỗng
+                      selectedAnswer={selectedAnswer}
+                      onChange={onChange}
+                      disabled={disabled}
+                      childQuestions={childQuestions}
+                      childAnswers={childAnswers}
+                      onChildAnswerChange={onChildAnswerChange}
+                      imageUrl={question.image_url}
+                      hideChildQuestionText={hideChildQuestionText}
+                      componentType={compType}
+                      options={question.options || (childQuestions && childQuestions[0]?.options) || []}
+                    />
                 ) : (
              <div className="space-y-4 pt-4 border-t border-slate-100">
                {question.image_url && (

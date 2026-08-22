@@ -3,6 +3,7 @@ import MCQStandard from "./question-types/MCQStandard";
 import LatexFormulaQuestion from "./question-types/LatexFormulaQuestion";
 import EssayInput from "./question-types/EssayInput";
 import FillBlankInput from "./question-types/FillBlankInput";
+import MatchingBlock from "./question-types/MatchingBlock";
 import UnknownQuestionFallback from "./question-types/UnknownQuestionFallback";
 import ReadingSplitScreen from "./question-types/ReadingSplitScreen";
 
@@ -193,7 +194,15 @@ export const QuestionRenderer: React.FC<QuestionRendererProps> = ({
             return (
               <>
                 {/* Render Children or Grouped Input */}
-                {(["table_completion", "summary_completion", "diagram_label_completion", "sentence_completion", "matching_features"].includes(compType) || hasImage) ? (
+                {["matching_features", "matching_headings", "matching_sentence_endings"].includes(compType) ? (
+                   <MatchingBlock
+                     parentQuestion={question}
+                     childQuestions={childQuestions}
+                     childAnswers={childAnswers}
+                     onChildAnswerChange={onChildAnswerChange}
+                     disabled={disabled}
+                   />
+                ) : (["table_completion", "summary_completion", "diagram_label_completion", "sentence_completion"].includes(compType) || hasImage) ? (
                    <FillBlankInput
                      questionId={question.id}
                      questionText={contentText} // Truyền nội dung thật xuống thay vì pass rỗng

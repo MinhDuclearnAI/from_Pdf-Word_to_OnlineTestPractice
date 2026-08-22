@@ -52,9 +52,9 @@ export const FillBlankInput: React.FC<FillBlankInputProps> = ({
 
   if (totalBlanks === 0) {
     if (childQuestions && childQuestions.length > 0) {
-      // Dạng hình ảnh thuần túy hoặc không có text đục lỗ, nhưng có childQuestions (từ block parent)
+      // Dạng câu hỏi con (Sentence Completion, Short Answer, hoặc Diagram có child questions)
       return (
-        <div className="w-full">
+        <div className="w-full space-y-4">
           {questionText && (
             <div className="text-base font-medium text-slate-800 mb-4 whitespace-pre-wrap leading-relaxed">
               {questionText}
@@ -71,27 +71,65 @@ export const FillBlankInput: React.FC<FillBlankInputProps> = ({
             </div>
           )}
 
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-3.5">
             {childQuestions.map((child) => {
               const cAns = childAnswers?.[String(child.id)] || "";
               const qNum = child.displayNumber || child.original_question_number || "-";
+              const cText = child.question_text || "";
+              
+              // Kiểm tra xem câu con có chứa đục lỗ inline ([blank], ___, ....) không
+              const CHILD_BLANK_REGEX = /___+|\[blank(?:_\d+)?\]|\.{3,}/gi;
+              const cHasInlineBlank = CHILD_BLANK_REGEX.test(cText);
+              const cParts = cText.split(CHILD_BLANK_REGEX);
+              const cTotalBlanks = cText.match(CHILD_BLANK_REGEX)?.length || 0;
+
               return (
-                <div key={child.id} className="flex items-center gap-3 bg-slate-50 px-3 py-2.5 rounded-xl border border-slate-200 flex-wrap">
-                  <span className="font-bold text-slate-600 text-sm bg-white px-2 py-1 rounded-lg shadow-sm border border-slate-200 min-w-[28px] text-center flex-shrink-0">{qNum}</span>
-                  {child.question_text && 
-                   !hideChildQuestionText &&
-                   !/^Question\s*\d+$/i.test(child.question_text) && 
-                   !/^Blank\s*\d+$/i.test(child.question_text) && (
-                     <span className="text-slate-700 font-medium mr-2 flex-1 min-w-[200px]">{child.question_text}</span>
+                <div 
+                  key={child.id} 
+                  className="p-4 sm:p-5 bg-white border border-slate-200/80 rounded-2xl shadow-xs flex items-start gap-3.5 sm:gap-4 transition-all hover:border-slate-300"
+                >
+                  {/* Ô thứ tự câu hỏi ở bên trái */}
+                  <span className="font-bold text-slate-800 text-sm bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200 shadow-2xs min-w-[36px] text-center flex-shrink-0 mt-0.5">
+                    {qNum}
+                  </span>
+
+                  {cHasInlineBlank ? (
+                    /* Dạng điền khuyết trực tiếp thay thế vị trí dấu chấm hoặc [blank] */
+                    <div className="text-sm sm:text-base font-medium text-slate-800 leading-loose flex-1">
+                      {cParts.map((part, pIdx) => (
+                        <React.Fragment key={pIdx}>
+                          <span>{part}</span>
+                          {pIdx < cTotalBlanks && (
+                            <input
+                              type="text"
+                              disabled={disabled}
+                              value={cAns}
+                              onChange={(e) => onChildAnswerChange && onChildAnswerChange(child.id, e.target.value)}
+                              placeholder={`${qNum}`}
+                              className="inline-block mx-1.5 px-3 py-1 bg-white border border-slate-300 rounded-lg text-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 text-center font-bold text-sm min-w-[110px] w-auto max-w-[200px] transition-all shadow-xs align-middle placeholder:text-slate-300 placeholder:font-normal"
+                            />
+                          )}
+                        </React.Fragment>
+                      ))}
+                    </div>
+                  ) : (
+                    /* Dạng câu hỏi ngắn không có đục lỗ ở giữa */
+                    <div className="flex-1 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      {cText && (
+                        <span className="text-sm sm:text-base font-medium text-slate-800 leading-relaxed">
+                          {cText}
+                        </span>
+                      )}
+                      <input
+                        type="text"
+                        disabled={disabled}
+                        value={cAns}
+                        onChange={(e) => onChildAnswerChange && onChildAnswerChange(child.id, e.target.value)}
+                        placeholder="Your answer..."
+                        className="w-full sm:max-w-[200px] px-3.5 py-2 bg-white border border-slate-300 rounded-xl text-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-500/50 transition-all font-medium text-sm placeholder:font-normal placeholder:text-slate-400"
+                      />
+                    </div>
                   )}
-                  <input
-                    type="text"
-                    disabled={disabled}
-                    value={cAns}
-                    onChange={(e) => onChildAnswerChange && onChildAnswerChange(child.id, e.target.value)}
-                    placeholder="Your answer..."
-                    className="w-full max-w-[220px] px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-500/50 transition-all font-medium text-sm placeholder:font-normal placeholder:text-slate-400"
-                  />
                 </div>
               );
             })}
@@ -143,21 +181,36 @@ export const FillBlankInput: React.FC<FillBlankInputProps> = ({
           </span>
         )}
         <div className="text-base font-medium text-slate-800 whitespace-pre-wrap leading-loose font-mono md:font-sans flex-1">
-          {parts.map((part, index) => (
-            <React.Fragment key={index}>
-              <span>{part}</span>
-              {index < totalBlanks && (
-                <input
-                  type="text"
-                  disabled={disabled}
-                  value={answersList[index] || ""}
-                  onChange={(e) => handleInputChange(index, e.target.value)}
-                  placeholder={`${index + 1}`}
-                  className="inline-block mx-1 px-2 py-0.5 bg-white border border-slate-300 rounded-md text-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 text-center font-bold text-sm min-w-[60px] w-[80px] max-w-[120px] transition-all shadow-sm align-middle placeholder:text-slate-300 placeholder:font-normal"
-                />
-              )}
-            </React.Fragment>
-          ))}
+          {parts.map((part, index) => {
+            const childObj = childQuestions && childQuestions[index];
+            const blankNum = childObj
+              ? String(childObj.displayNumber || childObj.original_question_number || (index + 1))
+              : `${index + 1}`;
+            const currentVal = (childObj && childAnswers)
+              ? (childAnswers[String(childObj.id)] ?? answersList[index] ?? "")
+              : (answersList[index] || "");
+
+            return (
+              <React.Fragment key={index}>
+                <span>{part}</span>
+                {index < totalBlanks && (
+                  <input
+                    type="text"
+                    disabled={disabled}
+                    value={currentVal}
+                    onChange={(e) => {
+                      handleInputChange(index, e.target.value);
+                      if (childObj && onChildAnswerChange) {
+                        onChildAnswerChange(childObj.id, e.target.value);
+                      }
+                    }}
+                    placeholder={blankNum}
+                    className="inline-block mx-1 px-2 py-0.5 bg-white border border-slate-300 rounded-md text-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 text-center font-bold text-sm min-w-[60px] w-[80px] max-w-[120px] transition-all shadow-sm align-middle placeholder:text-slate-400 placeholder:font-bold"
+                  />
+                )}
+              </React.Fragment>
+            );
+          })}
         </div>
       </div>
     </div>

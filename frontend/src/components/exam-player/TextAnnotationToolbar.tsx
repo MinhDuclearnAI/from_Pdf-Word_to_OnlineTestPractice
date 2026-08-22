@@ -31,11 +31,25 @@ export const TextAnnotationToolbar: React.FC<AnnotationToolbarProps> = ({ contai
         return;
       }
 
-      // 1. Kiểm tra xem có click vào một Highlight đã có sẵn không
       const target = e.target as HTMLElement;
+
+      // Bỏ qua tuyệt đối nếu click/thao tác bên ngoài hoặc trong các thành phần điều khiển giao diện
+      if (target.closest("header, footer, nav, button, input, textarea, select, .no-annotate, #horizontal-navigator, #overview-modal, [role='dialog']")) {
+        if (!isNoteOpen) {
+          setToolbarPos(null);
+          setSelectedRange(null);
+          setActiveMark(null);
+        }
+        return;
+      }
+
+      // 1. Kiểm tra xem có click vào một Highlight đã có sẵn không
       const clickedMark = target.closest("mark[data-ielts-highlight='true']") as HTMLElement;
       
       if (clickedMark) {
+        if (containerRef?.current && !containerRef.current.contains(clickedMark)) {
+          return;
+        }
         const rect = clickedMark.getBoundingClientRect();
         setActiveMark(clickedMark);
         setSelectedRange(null);
@@ -69,10 +83,33 @@ export const TextAnnotationToolbar: React.FC<AnnotationToolbarProps> = ({ contai
         return;
       }
 
-      // Kiểm tra vùng bôi đen có nằm trong container bài thi hay không (nếu có truyền ref)
+      // Kiểm tra vùng bôi đen: Bắt buộc phải nằm trong phạm vi Bài đọc / Câu hỏi
+      const anchorNode = selection.anchorNode;
+      const focusNode = selection.focusNode;
+      if (!anchorNode || !focusNode) return;
+
+      const anchorEl = anchorNode instanceof Element ? anchorNode : anchorNode.parentElement;
+      const focusEl = focusNode instanceof Element ? focusNode : focusNode.parentElement;
+
+      // Loại bỏ nếu điểm đầu hoặc điểm cuối rơi vào các thành phần UI / Header / Footer
+      const uiSelector = "header, footer, nav, button, input, textarea, select, .no-annotate, #horizontal-navigator, #overview-modal, [role='dialog']";
+      if (anchorEl?.closest(uiSelector) || focusEl?.closest(uiSelector)) {
+        if (!isNoteOpen) {
+          setToolbarPos(null);
+          setSelectedRange(null);
+          setActiveMark(null);
+        }
+        return;
+      }
+
+      // Bắt buộc nằm trong containerRef (nếu có)
       if (containerRef?.current) {
-        const anchorNode = selection.anchorNode;
-        if (anchorNode && !containerRef.current.contains(anchorNode)) {
+        if (!containerRef.current.contains(anchorNode) || !containerRef.current.contains(focusNode)) {
+          if (!isNoteOpen) {
+            setToolbarPos(null);
+            setSelectedRange(null);
+            setActiveMark(null);
+          }
           return;
         }
       }

@@ -453,9 +453,19 @@ def process_exam_upload_task(self, job_id: int, class_id: int, title: str, subje
                                     # Có ảnh: chỉ giữ instruction, KHÔNG thêm [blank_N] vào question_text
                                     # Frontend sẽ dùng childQuestions để render Grid Inputs
                                     q_text = instruction.strip()
+                                elif block.type in ["matching_features", "matching_headings"]:
+                                    # Dạng Matching: Block parent CHỈ chứa Instruction + Danh sách lựa chọn A-F (b_content).
+                                    # KHÔNG thêm [blank_N] vào parent để Frontend render từng câu con kèm input riêng
+                                    q_text = f"{instruction}\n\n{b_content}".strip()
+                                elif block.type == "sentence_completion":
+                                    # Với Sentence Completion, block parent chỉ giữ Instruction,
+                                    # mỗi câu con tự render câu hoàn chỉnh kèm ô điền riêng
+                                    q_text = instruction.strip() if instruction else ""
                                 else:
-                                    # Tránh bị đúp ô trống: chỉ thêm [blank] nếu trong text KHÔNG CÓ sẵn ___
-                                    if "___" not in b_content and "[blank" not in b_content:
+                                    # Summary / Table completion dạng đoạn văn đục lỗ
+                                    import re as _re
+                                    has_blanks = "___" in b_content or "[blank" in b_content or bool(_re.search(r'\.{3,}', b_content))
+                                    if not has_blanks and q_count > 0:
                                         blanks = "\n".join([f"[blank_{i}]" for i in range(1, q_count + 1)])
                                         q_text = f"{instruction}\n\n{b_content}\n\n{blanks}".strip()
                                     else:
@@ -468,12 +478,19 @@ def process_exam_upload_task(self, job_id: int, class_id: int, title: str, subje
                             import json
                             merged_answers = json.dumps(answers, ensure_ascii=False) if any(answers) else ""
 
+                            # Lấy options dùng chung nếu là block Matching
+                            parent_opts = []
+                            if block.type in ["matching_features", "matching_headings"] and block.questions:
+                                first_q_opts = getattr(block.questions[0], 'options', [])
+                                if first_q_opts:
+                                    parent_opts = first_q_opts
+
                             parent_q = QuestionSchema(
                                 id=block.block_id,
                                 block_id=block.block_id,
                                 type=block.type,
                                 question_text=q_text,
-                                options=[],
+                                options=parent_opts,
                                 correct_answer=merged_answers,
                                 image_url=img_url,
                                 passage_ref=p_ref_val,
@@ -493,12 +510,22 @@ def process_exam_upload_task(self, job_id: int, class_id: int, title: str, subje
                                         logger.warning(f"Drop câu rác do ảo giác: {orig_num} không nằm trong {block.range_start}-{block.range_end}")
                                         continue
 
+                                # Tự động phục hồi question_text từ content_before / content_after nếu rỗng
+                                child_text = q.question_text
+                                if not child_text:
+                                    cb = getattr(q, 'content_before', '') or ''
+                                    ca = getattr(q, 'content_after', '') or ''
+                                    if cb or ca:
+                                        child_text = f"{cb} [blank] {ca}".strip()
+                                    else:
+                                        child_text = ""
+
                                 child_q = QuestionSchema(
                                     id=q.id if getattr(q, 'id', None) else f"{block.block_id}_{idx}",
                                     original_question_number=orig_num,
                                     block_id=block.block_id,
                                     type=getattr(q, 'type', None) or block.type,
-                                    question_text=q.question_text,
+                                    question_text=child_text,
                                     options=getattr(q, 'options', []),
                                     correct_answer=getattr(q, 'correct_answer', ""),
                                     image_url=None, 

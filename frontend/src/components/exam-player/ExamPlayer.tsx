@@ -7,7 +7,7 @@ import SubmitConfirmModal from "./SubmitConfirmModal";
 import ReadingSplitScreen from "./question-types/ReadingSplitScreen";
 import TextAnnotationToolbar from "./TextAnnotationToolbar";
 import Button from "../ui/Button";
-import { ChevronLeft, ChevronRight, Flag, LayoutGrid, X, FileText } from "lucide-react";
+import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Flag, LayoutGrid, X, FileText } from "lucide-react";
 import apiClient from "@/lib/api-client";
 import { useRouter } from "next/navigation";
 
@@ -35,6 +35,8 @@ interface ExamPlayerProps {
 
 export const ExamPlayer: React.FC<ExamPlayerProps> = ({ exam, questions: rawQuestions, examId }) => {
   const router = useRouter();
+  const mainWorkspaceRef = useRef<HTMLDivElement>(null);
+  const [isNavCollapsed, setIsNavCollapsed] = useState(false);
 
   // Single source of truth for English/IELTS language detection
   const isEnglishExam = ["ielts", "english", "tiếng anh"].some(
@@ -432,8 +434,8 @@ export const ExamPlayer: React.FC<ExamPlayerProps> = ({ exam, questions: rawQues
       </header>
 
       {/* 2. MAIN WORKSPACE */}
-      <main className="flex-1 overflow-hidden relative">
-        <TextAnnotationToolbar />
+      <main ref={mainWorkspaceRef} className="flex-1 overflow-hidden relative">
+        <TextAnnotationToolbar containerRef={mainWorkspaceRef} />
         {isIELTSReadingFormat && activeGroup ? (
           // IELTS SPLIT SCREEN
           <ReadingSplitScreen
@@ -539,35 +541,56 @@ export const ExamPlayer: React.FC<ExamPlayerProps> = ({ exam, questions: rawQues
         )}
       </main>
 
-      {/* 3. HORIZONTAL NAVIGATOR FOR ALL EXAMS */}
+      {/* 3. HORIZONTAL NAVIGATOR FOR ALL EXAMS (COLLAPSIBLE) */}
       {!showGrid && (
-        <div className="w-full bg-slate-50 border-t border-slate-200 px-4 py-2 flex items-center justify-center gap-1.5 sm:gap-2 overflow-x-auto shadow-inner z-20">
-          {(isIELTSReadingFormat && activeGroup ? actualQuestions.filter(aq => activeGroup.questions.some(gq => gq.item.id === aq.id)) : actualQuestions).map((q, qIndex) => {
-            const qId = String(q.id);
-            const isAns = answers[qId] !== undefined && answers[qId] !== null && answers[qId] !== "";
-            // Trong IELTS Navigator, ta đánh dấu current dựa trên việc câu hỏi đó có thuộc block đang xem hay không
-            // Nhưng hiện tại UI scroll đến item block parent, nên currentIndex có thể là index của block parent.
-            // Nên so sánh currentIndex với q.originalIndex hoặc parent của nó.
-            const isCurrent = currentIndex === q.originalIndex || (q.parent_id && questions[currentIndex]?.id === q.parent_id);
-            
-            return (
-              <button
-                key={qId}
-                onClick={() => scrollToQuestion(q.originalIndex)}
-                className={`flex items-center justify-center min-w-[36px] h-9 rounded-lg text-sm transition-all border flex-shrink-0 ${
-                  isCurrent && isAns
-                    ? "bg-brand-700 text-white border-brand-700 font-bold shadow-md transform scale-110 z-10"
-                    : isCurrent
-                    ? "bg-brand-500 text-white border-brand-500 font-bold shadow-md transform scale-110 z-10"
-                    : isAns
-                    ? "bg-brand-50 border-brand-200 text-brand-700 font-bold hover:bg-brand-100"
-                    : "bg-white border-slate-200 text-slate-500 font-medium hover:bg-slate-100"
-                }`}
-              >
-                {q.displayNumber}
-              </button>
-            );
-          })}
+        <div 
+          id="horizontal-navigator"
+          className={`w-full bg-slate-50 border-t border-slate-200 transition-all duration-300 relative z-20 ${
+            isNavCollapsed
+              ? "max-h-0 py-0 overflow-hidden border-t-0 opacity-0 pointer-events-none"
+              : "max-h-24 py-2 px-3 sm:px-4 shadow-inner opacity-100 flex items-center justify-between gap-2"
+          }`}
+        >
+          {/* Vùng cuộn danh sách câu hỏi ở giữa */}
+          <div className="flex-1 flex items-center justify-center gap-1.5 sm:gap-2 overflow-x-auto py-0.5">
+            {(isIELTSReadingFormat && activeGroup ? actualQuestions.filter(aq => activeGroup.questions.some(gq => gq.item.id === aq.id)) : actualQuestions).map((q, qIndex) => {
+              const qId = String(q.id);
+              const isAns = answers[qId] !== undefined && answers[qId] !== null && answers[qId] !== "";
+              // Trong IELTS Navigator, ta đánh dấu current dựa trên việc câu hỏi đó có thuộc block đang xem hay không
+              // Nhưng hiện tại UI scroll đến item block parent, nên currentIndex có thể là index của block parent.
+              // Nên so sánh currentIndex với q.originalIndex hoặc parent của nó.
+              const isCurrent = currentIndex === q.originalIndex || (q.parent_id && questions[currentIndex]?.id === q.parent_id);
+              
+              return (
+                <button
+                  key={qId}
+                  onClick={() => scrollToQuestion(q.originalIndex)}
+                  className={`flex items-center justify-center min-w-[36px] h-9 rounded-lg text-sm transition-all border flex-shrink-0 ${
+                    isCurrent && isAns
+                      ? "bg-brand-700 text-white border-brand-700 font-bold shadow-md transform scale-110 z-10"
+                      : isCurrent
+                      ? "bg-brand-500 text-white border-brand-500 font-bold shadow-md transform scale-110 z-10"
+                      : isAns
+                      ? "bg-brand-50 border-brand-200 text-brand-700 font-bold hover:bg-brand-100"
+                      : "bg-white border-slate-200 text-slate-500 font-medium hover:bg-slate-100"
+                  }`}
+                >
+                  {q.displayNumber}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Nút mũi tên thu gọn ở góc phải thanh câu hỏi */}
+          <div className="flex-shrink-0">
+            <button
+              onClick={() => setIsNavCollapsed(true)}
+              className="w-8 h-8 flex items-center justify-center rounded-lg bg-white border border-slate-200 text-slate-500 hover:text-brand-600 hover:border-brand-300 hover:bg-brand-50 shadow-xs transition-all"
+              title="Ẩn thanh câu hỏi"
+            >
+              <ChevronDown size={18} />
+            </button>
+          </div>
         </div>
       )}
 
@@ -575,10 +598,10 @@ export const ExamPlayer: React.FC<ExamPlayerProps> = ({ exam, questions: rawQues
       <footer className="flex-shrink-0 h-16 w-full bg-white border-t border-slate-200 flex items-center justify-between px-4 md:px-6 z-30 shadow-[0_-4px_10px_rgba(0,0,0,0.05)][0_-4px_10px_rgba(0,0,0,0.2)]">
         
         {/* Left: Grid overview toggle */}
-        <div className="flex items-center">
+        <div className="flex items-center gap-2">
           <button 
             onClick={() => setShowGrid(!showGrid)}
-            className="flex items-center gap-2 p-2 rounded-xl text-slate-500 hover border border-transparent hover transition-all font-medium text-sm"
+            className="flex items-center gap-2 p-2 rounded-xl text-slate-500 hover:bg-slate-100 border border-transparent transition-all font-medium text-sm"
           >
             <LayoutGrid size={20} />
             <span className="hidden sm:inline">Tổng quan</span>
@@ -612,7 +635,7 @@ export const ExamPlayer: React.FC<ExamPlayerProps> = ({ exam, questions: rawQues
           </div>
         )}
 
-        {/* Right: Navigation & Submit */}
+        {/* Right: Navigation, Submit & Toggle Nav Button */}
         <div className="flex items-center gap-2 md:gap-3">
            {isIELTSReadingFormat && activeGroup ? (
              <div className="hidden sm:flex items-center text-sm font-semibold text-slate-500 mr-2">
@@ -630,6 +653,7 @@ export const ExamPlayer: React.FC<ExamPlayerProps> = ({ exam, questions: rawQues
              onClick={handlePrev}
              disabled={currentIndex === 0}
              className="w-10 h-10 flex items-center justify-center rounded-xl border border-slate-200 text-slate-600 hover disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+             title="Câu trước"
            >
              <ChevronLeft size={20} />
            </button>
@@ -637,6 +661,7 @@ export const ExamPlayer: React.FC<ExamPlayerProps> = ({ exam, questions: rawQues
              onClick={handleNext}
              disabled={currentIndex === questions.length - 1}
              className="w-10 h-10 flex items-center justify-center rounded-xl border border-slate-200 text-slate-600 hover disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+             title="Câu sau"
            >
              <ChevronRight size={20} />
            </button>
@@ -646,6 +671,21 @@ export const ExamPlayer: React.FC<ExamPlayerProps> = ({ exam, questions: rawQues
            <Button variant="primary" onClick={() => setIsSubmitModalOpen(true)} disabled={isSubmitting} className="font-bold shadow-md h-10 px-4 md:px-6">
              Nộp bài
            </Button>
+
+           {/* Nút bấm ở góc phải Footer để bấm Lên / Xuống (Ẩn/Hiện thanh câu hỏi) */}
+           {!showGrid && (
+             <button
+               onClick={() => setIsNavCollapsed(!isNavCollapsed)}
+               className={`w-10 h-10 flex items-center justify-center rounded-xl border transition-all shadow-xs ${
+                 isNavCollapsed
+                   ? "bg-brand-50 border-brand-300 text-brand-600 hover:bg-brand-100 hover:border-brand-400"
+                   : "bg-white border-slate-200 text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+               }`}
+               title={isNavCollapsed ? "Mở danh sách câu hỏi" : "Ẩn danh sách câu hỏi"}
+             >
+               {isNavCollapsed ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+             </button>
+           )}
         </div>
       </footer>
 

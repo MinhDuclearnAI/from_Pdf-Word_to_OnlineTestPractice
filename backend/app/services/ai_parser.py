@@ -28,6 +28,64 @@ class AIParserService:
         self.extractor_model = settings.DEFAULT_EXTRACTION_MODEL
         self.max_retries = 2
 
+    def _call_llm(
+        self,
+        messages: List[dict],
+        model: Optional[str] = None,
+        temperature: float = 0.1,
+        max_tokens: int = 8192,
+        use_json_format: bool = True
+    ) -> str:
+        """
+        Gọi LLM an toàn với cơ chế Graceful Fallback (tự động bỏ response_format nếu proxy bị lỗi 400 Bad Request)
+        và Retry với Backoff cho các lỗi kết nối/rate limit/empty choices.
+        """
+        import time
+        target_model = model or self.extractor_model
+        last_error = None
+        
+        for retry in range(self.max_retries):
+            # Thử lần lượt có response_format (nếu use_json_format=True) rồi fallback sang None nếu proxy trả về lỗi 400
+            format_options = [{"type": "json_object"}, None] if use_json_format else [None]
+            for format_opt in format_options:
+                try:
+                    kwargs = {
+                        "model": target_model,
+                        "messages": messages,
+                        "temperature": temperature,
+                        "max_tokens": max_tokens
+                    }
+                    if format_opt is not None:
+                        kwargs["response_format"] = format_opt
+
+                    response = self.client.chat.completions.create(**kwargs)
+                    
+                    if getattr(response, "choices", None) is None or len(response.choices) == 0:
+                        err_obj = getattr(response, "error", None)
+                        logger.warning(f"Proxy trả về choices rỗng (attempt {retry + 1}): {response}")
+                        raise ValueError(f"Lỗi proxy API trả về empty choices: {err_obj or response}")
+                        
+                    content = response.choices[0].message.content
+                    if not content or not content.strip():
+                        raise ValueError("LLM trả về nội dung rỗng.")
+                        
+                    return content
+
+                except Exception as api_err:
+                    err_msg = str(api_err)
+                    # Nếu lỗi 400 BAD_REQUEST do response_format, lập tức fallback sang format_opt=None không cần đợi
+                    if format_opt is not None and ("400" in err_msg or "BAD_REQUEST" in err_msg or "invalid_request_error" in err_msg):
+                        logger.warning(f"Proxy báo lỗi 400 với response_format. Tự động fallback sang text prompt thuần: {err_msg}")
+                        continue
+                    
+                    last_error = api_err
+                    logger.warning(f"Lỗi gọi API LLM (lần thử {retry + 1}/{self.max_retries}): {err_msg}")
+                    break  # Chuyển sang lần retry tiếp theo sau khi sleep
+            
+            time.sleep(1.5 * (retry + 1))
+            
+        raise FileParsingError(f"Hệ thống AI lỗi: {str(last_error)}")
+
     def classify_document(self, raw_text: str) -> ClassificationResult:
         """
         Phân tích đoạn text đầu tiên để xác định môn học, loại đề thi và thời gian làm bài dự kiến.
@@ -36,24 +94,18 @@ class AIParserService:
         preview_text = raw_text[:1000] 
         
         try:
-            response = self.client.chat.completions.create(
+            messages = [
+                {"role": "system", "content": CLASSIFY_SYSTEM_PROMPT},
+                {"role": "user", "content": get_classification_prompt(preview_text)}
+            ]
+            raw_json = self._call_llm(
                 model=self.classifier_model,
-                messages=[
-                    {"role": "system", "content": CLASSIFY_SYSTEM_PROMPT},
-                    {"role": "user", "content": get_classification_prompt(preview_text)}
-                ],
+                messages=messages,
                 temperature=0.0,
                 max_tokens=500,
-                response_format={"type": "json_object"}
+                use_json_format=True
             )
-            
-            if getattr(response, "choices", None) is None or len(response.choices) == 0:
-                logger.error(f"API Error - Invalid choices received. Full response: {response}")
-                raise Exception("Hệ thống AI không trả về kết quả hợp lệ (có thể do lỗi kết nối hoặc bộ lọc an toàn). Vui lòng thử lại.")
-                
-            raw_json = response.choices[0].message.content
             result = safe_json_parse(raw_json, ClassificationResult)
-            
             logger.info(f"Phân loại thành công: Môn {result.subject}, Thời gian {result.duration} phút.")
             return result
 
@@ -61,6 +113,8 @@ class AIParserService:
             if isinstance(e, ValidationError):
                 logger.error(f"AI trả về sai format Pydantic (ClassificationResult): {str(e)}")
                 raise FileParsingError("Không thể nhận diện cấu trúc đề thi này.")
+            elif isinstance(e, FileParsingError):
+                raise e
             else:
                 logger.error(f"Lỗi kết nối API khi phân loại tài liệu: {str(e)}")
                 raise FileParsingError("Hệ thống AI hiện đang bận, vui lòng thử lại sau.")
@@ -92,29 +146,25 @@ class AIParserService:
         while attempt < self.max_retries:
             raw_json = None
             try:
-                response = self.client.chat.completions.create(
+                raw_json = self._call_llm(
                     model=self.extractor_model,
                     messages=messages,
                     temperature=0.1,
-                    max_tokens=8192, # Đã tăng lên vì batch
-                    response_format={"type": "json_object"}
+                    max_tokens=8192,
+                    use_json_format=True
                 )
-                
-                if getattr(response, "choices", None) is None or len(response.choices) == 0:
-                    logger.error(f"API Error - Invalid choices received in extraction. Full response: {response}")
-                    raise ValueError("Lỗi proxy API trả về empty choices.")
-                    
-                raw_json = response.choices[0].message.content
                 
                 # --- DEBUG: Lưu raw json ra file để kiểm tra ---
                 try:
                     import os, time
+                    from app.services.schema_validator import extract_json_from_markdown
                     debug_dir = os.path.join(os.getcwd(), "debug_logs")
                     os.makedirs(debug_dir, exist_ok=True)
                     timestamp = int(time.time())
                     debug_file = os.path.join(debug_dir, f"llm_output_batch_{timestamp}_attempt_{attempt}.json")
+                    clean_json_str = extract_json_from_markdown(raw_json)
                     with open(debug_file, "w", encoding="utf-8") as f:
-                        f.write(raw_json)
+                        f.write(clean_json_str)
                 except Exception as debug_err:
                     logger.warning(f"Lỗi khi lưu debug raw json: {debug_err}")
                 # -----------------------------------------------
@@ -140,28 +190,17 @@ class AIParserService:
                 messages.append({"role": "user", "content": error_feedback})
 
             except Exception as e:
-                logger.error(f"Lỗi API khi bóc tách batched blocks: {str(e)}", exc_info=True)
+                logger.error(f"Lỗi khi bóc tách batched blocks: {str(e)}", exc_info=True)
                 return ExamExtractionSchema(questions=[])
 
     def split_ielts_document(self, document_text: str) -> Optional[dict]:
         """
-        Dùng Regex nhận diện các mỏ neo 'Questions X-Y' để tự động cắt văn bản 
-        thành 3 phần Passage (lưu nguyên văn 100%) và 3 phần Questions (gửi cho LLM).
+        Dùng Thuật toán Phân đoạn 2 lớp (Two-tier Partitioning) kết hợp Smart Question Anchor Filter
+        để tự động tách 3 phần Passage (lưu nguyên văn 100%, trích xuất Title sạch) và 3 phần Questions (gửi cho LLM).
+        Hoạt động hoàn hảo trên cả 2 dạng: File chuẩn Cambridge (có READING PASSAGE 1/2/3) và File không có nhãn.
         """
         import re
-        pattern = r'(?i)\bQuestions?\s+(\d+)\s*[-–to\s]+\s*(\d+)'
-        matches = list(re.finditer(pattern, document_text))
-        
-        if not matches or len(matches) < 3:
-            return None
-            
-        p1_matches = [m for m in matches if int(m.group(1)) <= 13]
-        p2_matches = [m for m in matches if 14 <= int(m.group(1)) <= 26]
-        p3_matches = [m for m in matches if int(m.group(1)) >= 27]
-        
-        if not p1_matches or not p2_matches or not p3_matches:
-            return None
-            
+
         # Helper: Chuẩn hóa mượt mà các đoạn văn (Xóa ngắt dòng cứng của PDF bên trong đoạn)
         def _clean_passage_paragraphs(raw_text: str) -> str:
             if not raw_text or not raw_text.strip():
@@ -169,68 +208,137 @@ class AIParserService:
             paragraphs = re.split(r'\n\s*\n', raw_text)
             cleaned = []
             for p in paragraphs:
-                # Nối các dòng bị ngắt cứng bởi lề PDF thành 1 dòng mượt mà
                 clean_p = " ".join(p.split())
                 if clean_p:
                     cleaned.append(clean_p)
             return "\n\n".join(cleaned)
 
-        # --- 1. Tách Passage 1 (Nguyên văn) ---
-        p1_slice = document_text[:p1_matches[0].start()].strip()
-        p1_clean_head = re.sub(r'^(IELTS|READING|TEST|ACADEMIC|GENERAL|PRACTICE).*\n', '', p1_slice, flags=re.I).strip()
-        p1_lines = [l.strip() for l in p1_clean_head.split('\n') if l.strip()]
-        p1_title = p1_lines[0] if len(p1_lines) > 0 and len(p1_lines[0]) < 80 else 'Reading Passage 1'
-        p1_raw_body = p1_clean_head[len(p1_title):].strip() if p1_clean_head.startswith(p1_title) else p1_clean_head
-        p1_content = _clean_passage_paragraphs(p1_raw_body)
-        
-        # --- 2. Tách Questions 1 và Passage 2 (Nguyên văn) ---
-        inter_1_2 = document_text[p1_matches[-1].start():p2_matches[0].start()]
-        paras_1_2 = [p.strip() for p in re.split(r'\n\s*\n', inter_1_2) if p.strip()]
-        p2_paras = []
-        found_p2 = False
-        for p in paras_1_2:
-            is_q = bool(re.match(r'^(Questions?\s+\d+|\d+[\.\)]|[A-E][\.\s]|Choose|Complete|Write|TRUE|FALSE|NOT GIVEN|YES|NO)', p, re.I))
-            if not is_q and (len(p) > 100 or found_p2 or (len(p) > 5 and not p.endswith(('.', ':', '?')))):
-                found_p2 = True
-            if found_p2:
-                p2_paras.append(p)
-                
-        p2_start_idx = inter_1_2.find(p2_paras[0]) if p2_paras else len(inter_1_2)
-        p1_q_text = document_text[p1_matches[0].start():p1_matches[-1].start()] + '\n\n' + inter_1_2[:p2_start_idx].strip()
-        
-        p2_slice = inter_1_2[p2_start_idx:].strip()
-        p2_lines = [l.strip() for l in p2_slice.split('\n') if l.strip()]
-        p2_title = p2_lines[0] if len(p2_lines) > 0 and len(p2_lines[0]) < 80 else 'Reading Passage 2'
-        p2_raw_body = p2_slice[len(p2_title):].strip() if p2_slice.startswith(p2_title) else p2_slice
-        p2_content = _clean_passage_paragraphs(p2_raw_body)
+        # Helper: Trích xuất Title và làm sạch phần đầu bài đọc
+        def _extract_title_and_clean_passage(raw_text: str, default_title: str) -> tuple[str, str]:
+            if not raw_text or not raw_text.strip():
+                return default_title, ""
+            
+            t = raw_text.strip()
+            
+            # 1. Xóa câu hướng dẫn You should spend...
+            t = re.sub(r'(?i)^\s*You\s+should\s+spend\s+about\s+\d+\s+minut[eo]s\s+on\s+Questions?.*?(?:\n\s*\n|\.\s*\n)', '\n\n', t, flags=re.DOTALL)
+            # 2. Xóa rác "on pages X and Y." nếu bị sót lại ở đầu
+            t = re.sub(r'(?i)^\s*(?:which\s+are\s+based\s+on\s+)?(?:Reading\s+Passage\s+\d+\s+)?on\s+pages?\s+\d+(?:\s*(?:and|to|-)\s*\d+)?\.?\s*', '', t)
+            # 3. Xóa nhãn "READING PASSAGE X" ở đầu
+            t = re.sub(r'(?i)^\s*READING\s+PASSAGE\s+\d+\s*', '', t)
+            # 4. Xóa header chung IELTS nếu có
+            t = re.sub(r'^(IELTS|TEST|ACADEMIC|GENERAL|PRACTICE).*\n', '', t, flags=re.I).strip()
+            
+            paragraphs = [p.strip() for p in re.split(r'\n\s*\n', t) if p.strip()]
+            if not paragraphs:
+                return default_title, ""
+            
+            clean_paragraphs = []
+            title = default_title
+            title_found = False
 
-        # --- 3. Tách Questions 2 và Passage 3 (Nguyên văn) ---
-        inter_2_3 = document_text[p2_matches[-1].start():p3_matches[0].start()]
-        paras_2_3 = [p.strip() for p in re.split(r'\n\s*\n', inter_2_3) if p.strip()]
-        p3_paras = []
-        found_p3 = False
-        for p in paras_2_3:
-            is_q = bool(re.match(r'^(Questions?\s+\d+|\d+[\.\)]|[A-E][\.\s]|Choose|Complete|Write|TRUE|FALSE|NOT GIVEN|YES|NO)', p, re.I))
-            if not is_q and (len(p) > 100 or found_p3 or (len(p) > 5 and not p.endswith(('.', ':', '?')))):
-                found_p3 = True
-            if found_p3:
-                p3_paras.append(p)
+            for p in paragraphs:
+                p_clean = " ".join(p.split())
+                # Bỏ qua nếu là nhãn READING PASSAGE X nằm lẻ loi
+                if re.match(r'(?i)^READING\s+PASSAGE\s+\d+$', p_clean):
+                    continue
+                # Bỏ qua nếu là câu spend about...
+                if re.match(r'(?i)^You\s+should\s+spend\s+about', p_clean):
+                    continue
+                if re.match(r'(?i)^on\s+pages?\s+\d+', p_clean):
+                    continue
                 
-        p3_start_idx = inter_2_3.find(p3_paras[0]) if p3_paras else len(inter_2_3)
-        p2_q_text = document_text[p2_matches[0].start():p2_matches[-1].start()] + '\n\n' + inter_2_3[:p3_start_idx].strip()
+                # Nếu chưa có title và đoạn này ngắn (< 100 ký tự, không dấu chấm kết thúc)
+                if not title_found and len(p_clean) < 100 and not p_clean.endswith('.'):
+                    title = p_clean
+                    title_found = True
+                else:
+                    clean_paragraphs.append(p_clean)
 
-        p3_slice = inter_2_3[p3_start_idx:].strip()
-        p3_lines = [l.strip() for l in p3_slice.split('\n') if l.strip()]
-        p3_title = p3_lines[0] if len(p3_lines) > 0 and len(p3_lines[0]) < 80 else 'Reading Passage 3'
-        p3_raw_body = p3_slice[len(p3_title):].strip() if p3_slice.startswith(p3_title) else p3_slice
-        p3_content = _clean_passage_paragraphs(p3_raw_body)
+            if not title_found and clean_paragraphs and len(clean_paragraphs[0]) < 120:
+                title = clean_paragraphs.pop(0)
+
+            return title, "\n\n".join(clean_paragraphs)
+
+        # Step 1: Tìm tất cả các Question Anchors thực sự (Loại bỏ câu hướng dẫn spend about... on Questions X-Y)
+        raw_matches = list(re.finditer(r'(?i)\bQuestions?\s+(\d+)\s*[-–to\s]+\s*(\d+)', document_text))
+        valid_q_matches = []
+        for m in raw_matches:
+            pre_text = document_text[max(0, m.start() - 80):m.start()]
+            if re.search(r'(?i)spend\s+about.*?minutes\s+on\s*$', pre_text) or re.search(r'(?i)spend\s+about.*?on\s*$', pre_text):
+                continue
+            valid_q_matches.append({
+                "start_q": int(m.group(1)),
+                "end_q": int(m.group(2)),
+                "start_pos": m.start(),
+                "end_pos": m.end(),
+                "text": m.group(0)
+            })
+
+        if not valid_q_matches:
+            return None
+
+        # Phân loại anchors theo 3 phần thi IELTS (P1: 1-14, P2: 14-27, P3: >=27)
+        p1_anchors = [m for m in valid_q_matches if m["start_q"] <= 14 and m["end_q"] <= 14]
+        p2_anchors = [m for m in valid_q_matches if 14 <= m["start_q"] <= 27 and m["end_q"] <= 27]
+        p3_anchors = [m for m in valid_q_matches if m["start_q"] >= 27]
+
+        if not p1_anchors or not p2_anchors or not p3_anchors:
+            return None
+
+        # Dò tìm các nhãn READING PASSAGE 1/2/3 độc lập (không phải nằm trong câu "based on Reading Passage X on pages...")
+        all_rp = list(re.finditer(r'(?i)\bREADING\s+PASSAGE\s+([123])\b', document_text))
+        valid_rp = []
+        for m in all_rp:
+            context_before = document_text[max(0, m.start() - 100) : m.start()].lower()
+            if "based on" in context_before or "spend about" in context_before:
+                continue
+            valid_rp.append(m)
         
-        # --- 4. Tách Questions 3 ---
-        p3_q_text = document_text[p3_matches[0].start():].strip()
+        rp2 = next((m for m in valid_rp if m.group(1) == '2'), None)
+        rp3 = next((m for m in valid_rp if m.group(1) == '3'), None)
+
+        p1_passage_raw = document_text[: p1_anchors[0]["start_pos"]]
+
+        if rp2 and rp3:
+            # === CHIẾN LƯỢC A: File chuẩn Cambridge có nhãn READING PASSAGE rõ ràng ===
+            p1_q_text = document_text[p1_anchors[0]["start_pos"] : rp2.start()].strip()
+            p2_passage_raw = document_text[rp2.start() : p2_anchors[0]["start_pos"]]
+            p2_q_text = document_text[p2_anchors[0]["start_pos"] : rp3.start()].strip()
+            p3_passage_raw = document_text[rp3.start() : p3_anchors[0]["start_pos"]]
+            p3_q_text = document_text[p3_anchors[0]["start_pos"] :].strip()
+        else:
+            # === CHIẾN LƯỢC B: File không có nhãn READING PASSAGE (Dò tìm điểm kết thúc câu 13 và câu 26) ===
+            chunk1 = document_text[p1_anchors[-1]["start_pos"] : p2_anchors[0]["start_pos"]]
+            q_items1 = list(re.finditer(r'(?m)^\s*(?:1[234]\.\s*.*?(?:\n\s*[A-D]\b[^\n]+)+|1[234]\.\s+[^\n]+)', chunk1))
+            if q_items1:
+                p2_start_pos = p1_anchors[-1]["start_pos"] + q_items1[-1].end()
+            else:
+                p2_start_pos = p1_anchors[-1]["end_pos"]
+
+            p1_q_text = document_text[p1_anchors[0]["start_pos"] : p2_start_pos].strip()
+            p2_passage_raw = document_text[p2_start_pos : p2_anchors[0]["start_pos"]]
+
+            chunk2 = document_text[p2_anchors[-1]["start_pos"] : p3_anchors[0]["start_pos"]]
+            q_items2 = list(re.finditer(r'(?m)^\s*(?:2[567]\.\s*.*?(?:\n\s*[A-D]\b[^\n]+)+|2[567]\.\s+[^\n]+)', chunk2))
+            if q_items2:
+                p3_start_pos = p2_anchors[-1]["start_pos"] + q_items2[-1].end()
+            else:
+                p3_start_pos = p2_anchors[-1]["end_pos"]
+
+            p2_q_text = document_text[p2_anchors[0]["start_pos"] : p3_start_pos].strip()
+            p3_passage_raw = document_text[p3_start_pos : p3_anchors[0]["start_pos"]]
+            p3_q_text = document_text[p3_anchors[0]["start_pos"] :].strip()
+
+        # Cắt bỏ phần Task 2 Writing nếu bị dính vào cuối P3
         task2_match = re.search(r'(?i)\n\s*(Task\s+2|Writing\s+Task)', p3_q_text)
         if task2_match:
             p3_q_text = p3_q_text[:task2_match.start()].strip()
-            
+
+        p1_title, p1_content = _extract_title_and_clean_passage(p1_passage_raw, "Reading Passage 1")
+        p2_title, p2_content = _extract_title_and_clean_passage(p2_passage_raw, "Reading Passage 2")
+        p3_title, p3_content = _extract_title_and_clean_passage(p3_passage_raw, "Reading Passage 3")
+
         return {
             'p1': {'title': p1_title, 'content': p1_content, 'questions_text': p1_q_text.strip()},
             'p2': {'title': p2_title, 'content': p2_content, 'questions_text': p2_q_text.strip()},
@@ -244,6 +352,7 @@ class AIParserService:
         """
         from app.prompts.ielts_extract_prompt import IELTS_FULL_SYSTEM_PROMPT, get_ielts_full_prompt
         from app.schemas.question import IELTSExamSchema
+        from app.services.schema_validator import extract_json_from_markdown
         
         split_info = self.split_ielts_document(document_text)
         
@@ -263,29 +372,24 @@ class AIParserService:
         while attempt < self.max_retries:
             raw_json = None
             try:
-                response = self.client.chat.completions.create(
+                raw_json = self._call_llm(
                     model=self.extractor_model,
                     messages=messages,
                     temperature=0.1,
-                    max_tokens=8192, 
-                    response_format={"type": "json_object"}
+                    max_tokens=8192,
+                    use_json_format=True
                 )
                 
-                if getattr(response, "choices", None) is None or len(response.choices) == 0:
-                    logger.error(f"API Error - Invalid choices received. Full response: {response}")
-                    raise ValueError("Lỗi proxy API trả về empty choices (Có thể do bộ lọc an toàn hoặc lag).")
-                    
-                raw_json = response.choices[0].message.content
-                
-                # --- DEBUG: Lưu raw json ra file để kiểm tra ---
+                # --- DEBUG: Lưu raw json thuần ra file để kiểm tra ---
                 try:
                     import os, time
                     debug_dir = os.path.join(os.getcwd(), "debug_logs")
                     os.makedirs(debug_dir, exist_ok=True)
                     timestamp = int(time.time())
                     debug_file = os.path.join(debug_dir, f"llm_output_ielts_{timestamp}_attempt_{attempt}.json")
+                    clean_json_str = extract_json_from_markdown(raw_json)
                     with open(debug_file, "w", encoding="utf-8") as f:
-                        f.write(raw_json)
+                        f.write(clean_json_str)
                 except Exception as debug_err:
                     logger.warning(f"Lỗi khi lưu debug raw json: {debug_err}")
                 # -----------------------------------------------
@@ -323,6 +427,8 @@ class AIParserService:
                 messages.append({"role": "user", "content": error_feedback})
 
             except Exception as e:
+                if isinstance(e, FileParsingError):
+                    raise e
                 logger.error(f"Lỗi API khi bóc tách IELTS Full Document: {str(e)}", exc_info=True)
                 raise FileParsingError(f"Hệ thống AI lỗi: {str(e)}")
 

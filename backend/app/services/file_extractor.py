@@ -24,25 +24,63 @@ def strip_structure_markers(text: str) -> str:
 
 def clean_and_normalize_text(raw_text: str) -> str:
     """
-    Chuẩn hóa khoảng trắng ngang (space, tab) để làm sạch văn bản, 
-    NHƯNG tuyệt đối giữ nguyên các dấu xuống dòng (line breaks) để bảo toàn tách đoạn gốc.
+    Chuẩn hóa khoảng trắng ngang và nối liền các dòng bị ngắt mềm (soft-linebreaks) do lề PDF,
+    kể cả Danh từ riêng viết hoa, Số liệu, Từ ghép có gạch nối; 
+    đồng thời bảo toàn 100% các dòng trống tách đoạn (\n\n) và cấu trúc tiêu đề, câu hỏi.
     """
     if not raw_text or not raw_text.strip():
         return ""
 
     import re
-    # Xóa khoảng trắng ngang thừa (space, tab) nhưng tạm thời giữ lại \n
+    # 1. Xóa khoảng trắng ngang thừa (spaces, tabs) nhưng giữ lại \n
     text = re.sub(r'[^\S\n]+', ' ', raw_text)
     
-    # SỬA LỖI NGẮT DÒNG (WRAPPING):
-    # Chỉ áp dụng quy tắc an toàn nhất: chữ trước là chữ thường (hoặc phẩy, gạch nối) 
-    # và chữ sau là chữ thường thì nối lại.
-    text = re.sub(r'([a-z,-])[ \t]*\n[ \t]*([a-z])', r'\1 \2', text)
+    # 2. Xử lý thông minh các dòng bị ngắt mềm do lề PDF
+    lines = text.split('\n')
+    unwrapped = []
     
+    for line in lines:
+        line_str = line.strip()
+        if not line_str:
+            unwrapped.append("") # Bảo toàn tách đoạn \n\n
+            continue
+            
+        if not unwrapped or unwrapped[-1] == "":
+            unwrapped.append(line_str)
+            continue
+            
+        prev = unwrapped[-1]
+        
+        # Kiểm tra nếu dòng hiện tại là bắt đầu của một khối mới (câu hỏi, đáp án [A-Z], tiêu đề) -> KHÔNG nối
+        is_new_block_start = bool(re.match(
+            r'^(Questions?\s+\d+|\d+[\.\)]|[A-Z][\.\)]|[A-Z]\s+|READING\s+PASSAGE|TRUE|FALSE|NOT GIVEN|YES|NO|Choose|Complete|Write|List\s+of)', 
+            line_str, 
+            re.I
+        ))
+        
+        # Kiểm tra nếu dòng trước là tiêu đề / header đơn lẻ (< 80 ký tự)
+        is_prev_header = bool(re.match(r'^(READING\s+PASSAGE|Questions?\s+\d+)', prev, re.I)) or (
+            len(prev) < 80 and (prev.endswith('!') or not prev.endswith(('.', ':', ';', ',')) and len(prev.split()) <= 8)
+        )
+        
+        if is_new_block_start or is_prev_header:
+            unwrapped.append(line_str)
+            continue
+            
+        # Nếu dòng trước kết thúc bằng dấu gạch nối (từ bị bẻ đôi qua lề: e.g. "Triassic-", "disease-")
+        if prev.endswith('-'):
+            unwrapped[-1] = prev + line_str
+        elif not prev.endswith(('.', '!', '?', ':')):
+            # Dòng trước chưa kết thúc câu (dù kết thúc bằng từ thường, từ viết hoa hay số liệu) -> Nối với 1 khoảng trắng
+            unwrapped[-1] = prev + " " + line_str
+        else:
+            # Dòng trước kết thúc bằng dấu chấm nhưng trong cùng một đoạn văn (không có dòng trống \n\n)
+            unwrapped[-1] = prev + " " + line_str
+            
+    result = "\n".join(unwrapped)
     # Rút gọn các dòng trống liên tiếp (3 trở lên) thành 2 dòng trống (chuẩn tách đoạn \n\n)
-    text = re.sub(r'\n{3,}', '\n\n', text)
-    
-    return text.strip()
+    result = re.sub(r'\n{3,}', '\n\n', result)
+    return result.strip()
 
 def is_continuation(prev_text: str, next_text: str) -> bool:
     if not prev_text or not next_text:
@@ -51,7 +89,17 @@ def is_continuation(prev_text: str, next_text: str) -> bool:
     next_text = next_text.strip()
     if not prev_text or not next_text:
         return False
-        
+
+    import re
+    # 1. BẢO VỆ TUYỆT ĐỐI: Nếu khối sau là bắt đầu của 1 câu hỏi, đáp án, header -> KHÔNG BAO GIỜ GỘP!
+    if re.match(r'^(Questions?\s+\d+|\d+[\.\)]|[A-Z][\.\)]|[A-Z]\s+|READING\s+PASSAGE|TRUE|FALSE|NOT GIVEN|YES|NO|Choose|Complete|Write|List\s+of)', next_text, re.I):
+        return False
+
+    # 2. BẢO VỆ TIÊU ĐỀ: Nếu dòng trước là tiêu đề đứng độc lập (< 80 ký tự)
+    if len(prev_text) < 80 and (prev_text.endswith('!') or not prev_text.endswith(('.', ':', ';', ',')) and len(prev_text.split()) <= 8):
+        return False
+
+    # 3. Nối từ bị bẻ đôi bằng gạch nối
     if prev_text.endswith("-"):
         return True
         
@@ -65,14 +113,11 @@ def is_continuation(prev_text: str, next_text: str) -> bool:
     if prev_text.endswith(","):
         return True
 
-    # Bỏ logic ghép khối theo độ dài để tránh gộp sai tiêu đề (Title) vào đoạn văn (Passage)
-    return False
-
     return False
 
 def extract_text_from_pdf(file_path: str) -> Tuple[str, bool]:
     """
-    Trích xuất text từ file PDF sử dụng PyMuPDF.
+    Trích xuất text từ file PDF sử dụng PyMuPDF với khả năng nhận diện bố cục 2 cột (Multi-column Sorter).
     Trả về Tuple[text_đã_trích_xuất, is_scanned_pdf].
     """
     text_content = []
@@ -98,17 +143,15 @@ def extract_text_from_pdf(file_path: str) -> Tuple[str, bool]:
         
         for page_num in range(len(doc)):
             page = doc.load_page(page_num)
+            page_width = page.rect.width
             page_height = page.rect.height
-            top_margin = 60
-            bottom_margin = page_height - 60
             
-            # Sử dụng sort=True để PyMuPDF tự động phán đoán thứ tự đọc (Reading Order)
-            blocks = page.get_text("blocks", sort=True)
+            # Lấy danh sách blocks thô từ PyMuPDF
+            blocks = page.get_text("blocks", sort=False)
             
             images_in_page = page_assets.get(page_num, [])
-            images_in_page.sort(key=lambda img: img["y0"])
             
-            # 2. Xử lý Trộn (Interleave) Text và Ảnh theo trục Y để ảnh đúng vị trí
+            # 2. Thu thập các text blocks và image items trên trang
             page_items = []
             
             for b in blocks:
@@ -118,9 +161,9 @@ def extract_text_from_pdf(file_path: str) -> Tuple[str, bool]:
                     if not page_text:
                         continue
                         
-                    # Lọc rác dựa trên không gian (Spatial Filtering) cho Header/Footer
-                    is_in_margin = y0 < 70 or y1 > page_height - 70
-                    if is_in_margin and len(page_text) < 100:
+                    # Lọc rác Header/Footer (Page number, URL)
+                    is_in_margin = y0 < 50 or y1 > page_height - 50
+                    if is_in_margin and len(page_text) < 80:
                         pt_lower = page_text.lower()
                         is_page_num = bool(re.match(r'^\d+$', page_text)) or "page" in pt_lower
                         is_url = bool(re.match(r'^https?://', pt_lower)) or bool(re.match(r'^www\.', pt_lower)) or ".com" in pt_lower or ".org" in pt_lower or ".vn" in pt_lower
@@ -129,7 +172,10 @@ def extract_text_from_pdf(file_path: str) -> Tuple[str, bool]:
                             
                     page_items.append({
                         "type": "text",
+                        "x0": x0,
                         "y0": y0,
+                        "x1": x1,
+                        "y1": y1,
                         "content": page_text
                     })
                     is_scanned = False
@@ -137,14 +183,44 @@ def extract_text_from_pdf(file_path: str) -> Tuple[str, bool]:
             for asset in images_in_page:
                 page_items.append({
                     "type": "image",
+                    "x0": asset.get("x0", 0),
                     "y0": asset["y0"],
+                    "x1": asset.get("x1", page_width),
+                    "y1": asset.get("y1", asset["y0"] + 100),
                     "url": asset["image_url"]
                 })
                 
-            # Sắp xếp lại toàn bộ item trên trang từ trên xuống dưới
-            page_items.sort(key=lambda item: item["y0"])
+            # 3. THUẬT TOÁN PHÁT HIỆN & SẮP XẾP BỐ CỤC (SINGLE COLUMN vs TWO COLUMNS)
+            left_col = [item for item in page_items if item["x1"] <= page_width * 0.55 and item["x0"] < page_width * 0.45]
+            right_col = [item for item in page_items if item["x0"] >= page_width * 0.45 and item["x1"] > page_width * 0.55]
             
-            for item in page_items:
+            is_two_column = len(left_col) >= 2 and len(right_col) >= 2
+            
+            if is_two_column:
+                # Tìm Y nơi bắt đầu phân 2 cột
+                col_top_y = min(min(item["y0"] for item in left_col), min(item["y0"] for item in right_col))
+                
+                # Header items (nằm trên vùng 2 cột hoặc trải rộng ngang trang)
+                header_items = [
+                    item for item in page_items 
+                    if item["y1"] <= col_top_y + 10 or (item["x0"] < page_width * 0.35 and item["x1"] > page_width * 0.65)
+                ]
+                header_ids = set(id(x) for x in header_items)
+                
+                # Cột Trái và Cột Phải (loại bỏ header)
+                c_left = [item for item in page_items if id(item) not in header_ids and item["x0"] < page_width * 0.5]
+                c_right = [item for item in page_items if id(item) not in header_ids and item["x0"] >= page_width * 0.5]
+                
+                header_items.sort(key=lambda item: item["y0"])
+                c_left.sort(key=lambda item: item["y0"])
+                c_right.sort(key=lambda item: item["y0"])
+                
+                ordered_items = header_items + c_left + c_right
+            else:
+                # Trang 1 cột chuẩn: sắp xếp tuần tự theo chiều dọc Y từ trên xuống dưới
+                ordered_items = sorted(page_items, key=lambda item: item["y0"])
+            
+            for item in ordered_items:
                 if item["type"] == "image":
                     text_content.append(f"\n[[IMAGE_REF: {item['url']}]]\n")
                 else:
